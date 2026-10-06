@@ -685,6 +685,35 @@ Se o IP do servidor mudar, atualiza-se **só o `hosts` do servidor** (ou a reser
 - Número da venda: `EXT-yyyyMMdd-0001`
 - Tabelas PostgreSQL: `vendas_externas`, `itens_venda_externa`; movimentações de estoque vinculadas via `venda_externa_id`
 
+### Vendas Site (integração com o e-commerce)
+- Menu lateral **Vendas Site** (ícone 🌐), logo abaixo de **Vendas externas**
+- Lista as vendas que o **ImperialSync** criou **neste banco** a partir de pedidos pagos no site: **Pedido Site**, **Nº Venda**, **Cliente**, **Data**, **Total**, **Pagamento**, **Parcelas**, **Status** e **Sincronizado em**. Mais recente primeiro, 50 por página, com busca por pedido do site, número da venda ou nome do comprador
+- A lista nasce do registro da integração (`integration.imperial_sync_operations`), então **só aparece venda que veio do site** — venda de balcão nunca entra. Se alguém excluir uma venda depois de sincronizada, a linha continua na lista como **Venda removida** (o registro da integração não tem chave estrangeira de propósito)
+- **Somente leitura:** este sistema não cria nem altera venda online. Quem cria a venda é a função `integration.apply_sale_create` do banco, chamada pelo ImperialSync, com a mesma sequência e as mesmas travas do PDV
+- Estados da tela, todos **dentro da própria janela** (nenhuma caixa de diálogo): carregando, lista vazia, erro ao carregar (com **Tentar novamente**) e "integração indisponível" quando o schema `integration` não foi instalado ou o usuário do sistema não pode lê-lo
+- Botão **Sincronizar com o Site** — executa `ImperialSync.exe --once` (vendas do site para a loja e, em seguida, o estoque da loja para o site):
+  - Roda em segundo plano, **sem travar a tela**; o botão fica bloqueado ("Sincronizando...") e uma segunda execução não é aceita enquanto a primeira não termina (vale também se o operador sair da aba e voltar). Em outro computador da loja, o próprio ImperialSync recusa uma segunda execução ao mesmo tempo (código 13)
+  - Mensagens: `Sincronizando com o site...`, `Sincronização concluída com sucesso.` e, se o programa não estiver na pasta, `ImperialSync.exe não foi encontrado na pasta do sistema.`
+  - Ao terminar, a lista é recarregada sozinha. Um bloco **Detalhes da execução** mostra as últimas linhas do que o ImperialSync escreveu e o código de saída
+  - Prazo máximo de 10 minutos por execução; passado isso o processo é encerrado
+- **SKU do e-commerce = campo "Código do Produto"** do cadastro de produto (`TxtCodigoInterno` → `ProdutoDto.CodigoInterno` → `Produto.CodigoInterno` → coluna `produtos.codigo_interno`). O ImperialSync envia esse valor, sem alterar, como `sku` e o site o compara por igualdade exata com `ProductVariant.sku` (exemplo: Código do Produto `DIL001` → sku `DIL001`). Não renomeie essa propriedade nem a coluna sem avisar a integração; o teste `CodigoDoProdutoComoSkuTests` acusa.
+- **Este sistema não faz o trabalho do ImperialSync:** não chama a API do site, não assina nada, não conhece fila, reserva nem confirmação e não sincroniza estoque. O fluxo é `sistema → ImperialSync.exe → API do site → PostgreSQL → sistema recarrega a lista`
+- Códigos de saída do ImperialSync (`ImperialSync.exe --help`) e o que a tela diz:
+
+  | Código | Significado | Faixa |
+  | ------ | ----------- | ----- |
+  | `0` | Concluída | verde |
+  | `10`, `8` | Concluída, mas há vendas que precisam de atenção / nenhum produto para enviar | amarela |
+  | `3`, `13` | Outra sincronização já em andamento (neste computador / em outro) | amarela |
+  | `9` | Interrompida | amarela |
+  | `1`, `2`, `4`, `5`, `6`, `7`, `11`, `12` | Erro inesperado, configuração inválida, banco da loja inacessível, site recusou o acesso, site indisponível, estoque não confirmado, integração não instalada / loja incompatível, resposta do site sem assinatura válida | vermelha |
+  | outro | "terminou com o código N" (nunca é tratado como sucesso) | vermelha |
+
+- **Onde ficam os arquivos:** `ImperialSync.exe` e `ImperialSync.env` na **mesma pasta do `ImperialColors.exe`** (o sistema procura em `AppContext.BaseDirectory`). O `ImperialSync.env` tem senhas e segredos: **nunca** vai para o Git (está no `.gitignore`), nem por e-mail ou WhatsApp; restrinja o acesso no Windows com `icacls`
+- **Instalação no banco da loja (uma vez, à mão, com backup):** os scripts `imperialsync-integration-schema.sql` e `imperialsync-role.sql` do repositório do site (`docs/sql/`). O usuário do banco que o **sistema** usa (o do `.env`) precisa poder ler `integration.imperial_sync_operations` — o `postgres` já pode; o `imperial_sync` (do ImperialSync) **não** é o usuário do sistema e não precisa de nada além do que o script lhe dá
+- **Segurança da execução:** o processo do ImperialSync **não herda** as senhas e os segredos deste sistema (`DB_*` e variáveis com `PASSWORD`, `SECRET`, `TOKEN`... no nome); só as variáveis `STORE_DB_*`, `SYNC_*` e `INVENTORY_*`, que são dele. O texto que ele escreve passa por um filtro (sem segredos, hashes, CPF/CNPJ, e-mails nem dados de conexão) antes de aparecer na tela, e é limitado em tamanho
+- Testes: `VendaSiteServiceTests`, `VendaSiteRepositoryTests`, `VendaSiteIntegrationTests` (PostgreSQL, transação revertida), `SincronizacaoSiteServiceTests` (processos de verdade, com scripts no lugar do `.exe`), `SincronizacaoSiteMensagensTests`, `SaidaProcessoSeguraHelperTests`, `RegistroDeServicosVendasSiteTests`, `VendasSiteViewModelTests`, `VendasSiteViewTests`, `UiDispatcherTests` e `SincronizacaoSiteExeRealTests` (ponta a ponta com o `ImperialSync.exe` real, só roda com `IMPERIALSYNC_E2E_EXE`, `IMPERIALSYNC_E2E_CONEXAO` e `IMPERIALSYNC_E2E_PEDIDOS`)
+
 ### Orçamentos
 - Menu lateral **Orçamento** (ícone 📝), entre **PDV** e **Clientes**
 - Proposta comercial **sem compromisso**: não reserva estoque, não gera venda e não movimenta financeiro

@@ -27,11 +27,16 @@ internal static class ScriptAplicacaoAtualizacao
     /// cliente, não do pacote. O <c>.env</c> guarda credenciais do banco e dados da empresa —
     /// sobrescrever apontaria o PDV para um banco que não existe.
     ///
+    /// O <c>ImperialSync.env</c> (senha do usuário do ImperialSync no banco e segredos do site) mora
+    /// ao lado do <c>ImperialSync.exe</c>, na mesma pasta do sistema. O pacote de release não o
+    /// contém e esta troca só COPIA o que está no pacote (nada é apagado), então hoje ele já
+    /// sobreviveria; a entrada na lista garante que um pacote futuro nunca o sobrescreva.
+    ///
     /// O banco de contingência (vendas gravadas offline, ainda não sincronizadas) não está
     /// nesta lista porque não precisa: ele mora em %LOCALAPPDATA%\ImperialColors, fora da
     /// pasta de instalação, então a troca de arquivos nunca o alcança.
     /// </summary>
-    public static readonly string[] ArquivosPreservados = [".env"];
+    public static readonly string[] ArquivosPreservados = [".env", "ImperialSync.env"];
 
     public static string Gerar()
     {

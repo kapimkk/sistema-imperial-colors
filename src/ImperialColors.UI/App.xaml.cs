@@ -104,6 +104,7 @@ public partial class App : System.Windows.Application
                 services.AddTransient<FornecedorViewModel>();
                 services.AddTransient<ListaCompraViewModel>();
                 services.AddTransient<VendaExternaViewModel>();
+                services.AddTransient<VendasSiteViewModel>();
                 services.AddTransient<OrcamentoViewModel>();
                 services.AddTransient<NaturezaOperacaoViewModel>();
 

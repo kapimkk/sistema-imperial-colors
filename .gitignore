@@ -65,6 +65,8 @@ $RECYCLE.BIN/
 # Sensitive files — nunca commitar
 .env
 .env.example
+# ImperialSync: senha do banco e segredos do site
+ImperialSync.env
 appsettings.Development.json
 *.pfx
 *.p12

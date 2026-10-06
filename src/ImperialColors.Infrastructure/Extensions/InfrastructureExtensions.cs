@@ -11,6 +11,7 @@ using ImperialColors.Infrastructure.Repositories;
 using ImperialColors.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace ImperialColors.Infrastructure.Extensions;
@@ -83,6 +84,7 @@ public static class InfrastructureExtensions
         services.AddSingleton<IUsuarioRepository, UsuarioRepository>();
         services.AddSingleton<ITrocaRepository, TrocaRepository>();
         services.AddSingleton<IVendaExternaRepository, VendaExternaRepository>();
+        services.AddSingleton<IVendaSiteRepository, VendaSiteRepository>();
         services.AddSingleton<IOrcamentoRepository, OrcamentoRepository>();
         services.AddSingleton<IRelatorioAnalyticsRepository, RelatorioAnalyticsRepository>();
         services.AddSingleton<ILogAuditoriaRepository, LogAuditoriaRepository>();
@@ -93,6 +95,12 @@ public static class InfrastructureExtensions
         services.AddSingleton<INotaFiscalRepository, NotaFiscalRepository>();
 
         services.AddSingleton<IContingencyVendaService, ContingencyVendaService>();
+
+        // Executa o ImperialSync.exe (que fica ao lado do executável do sistema) e interpreta o
+        // resultado. Singleton: a trava de "uma sincronização por vez" vale para todas as telas.
+        services.AddSingleton<ISincronizacaoSiteService>(sp => new SincronizacaoSiteService(
+            new SincronizacaoSiteOptions(),
+            sp.GetService<ILogger<SincronizacaoSiteService>>()));
 
         services.AddSingleton<DatabaseHealthService>();
         services.AddSingleton<IDatabaseHealthService>(sp => sp.GetRequiredService<DatabaseHealthService>());

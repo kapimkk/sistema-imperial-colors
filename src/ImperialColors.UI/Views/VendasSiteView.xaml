@@ -1,0 +1,239 @@
+<UserControl x:Class="ImperialColors.UI.Views.VendasSiteView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:conv="clr-namespace:ImperialColors.UI.Converters"
+             xmlns:helpers="clr-namespace:ImperialColors.UI.Helpers">
+
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <!-- URI absoluta (pack://): a relativa resolve contra o assembly de ENTRADA, o que
+                     funciona com o app rodando mas quebra ao construir a tela em teste. Mesmo padrão
+                     de VendasExternasView, PDVView e ProdutoFormView. -->
+                <ResourceDictionary Source="pack://application:,,,/ImperialColors;component/Resources/AppTheme.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+            <conv:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+
+            <!-- Faixa de resultado da sincronização: a cor acompanha a gravidade. -->
+            <Style x:Key="FaixaSincronizacao" TargetType="Border">
+                <Setter Property="Background" Value="#E8F1FB"/>
+                <Setter Property="BorderBrush" Value="#B6D4F2"/>
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding GravidadeSincronizacao}" Value="Sucesso">
+                        <Setter Property="Background" Value="#D4EDDA"/>
+                        <Setter Property="BorderBrush" Value="#C3E6CB"/>
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding GravidadeSincronizacao}" Value="Atencao">
+                        <Setter Property="Background" Value="#FFF3CD"/>
+                        <Setter Property="BorderBrush" Value="#FFE69C"/>
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding GravidadeSincronizacao}" Value="Erro">
+                        <Setter Property="Background" Value="#F8D7DA"/>
+                        <Setter Property="BorderBrush" Value="#F1AEB5"/>
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+            <Style x:Key="TextoFaixaSincronizacao" TargetType="TextBlock">
+                <Setter Property="Foreground" Value="#0C4A8A"/>
+                <Setter Property="TextWrapping" Value="Wrap"/>
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding GravidadeSincronizacao}" Value="Sucesso">
+                        <Setter Property="Foreground" Value="#155724"/>
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding GravidadeSincronizacao}" Value="Atencao">
+                        <Setter Property="Foreground" Value="#856404"/>
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding GravidadeSincronizacao}" Value="Erro">
+                        <Setter Property="Foreground" Value="#721C24"/>
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <Grid Margin="30,25">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Cabeçalho: o texto cede espaço aos botões (e quebra a linha) quando a janela é estreita. -->
+        <Grid Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                <TextBlock Style="{StaticResource TituloModulo}" Text="Vendas do Site"/>
+                <TextBlock Text="Pedidos pagos no e-commerce que o ImperialSync já criou como venda neste sistema"
+                           FontSize="12" Foreground="{StaticResource CinzaTextoBrush}" Margin="0,4,0,0"
+                           TextWrapping="Wrap"/>
+            </StackPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0">
+                <Button x:Name="BtnAtualizar" Style="{StaticResource BotaoSecundario}" Margin="0,0,10,0"
+                        Command="{Binding CarregarCommand}" Content="🔄  Atualizar"
+                        ToolTip="Recarrega a lista de vendas do site."/>
+                <Button x:Name="BtnSincronizar" Style="{StaticResource BotaoPrimario}"
+                        Command="{Binding SincronizarCommand}" Content="{Binding TextoBotaoSincronizar}"
+                        ToolTip="Executa o ImperialSync: cria na loja as vendas pagas no site e envia o estoque da loja para o site."/>
+            </StackPanel>
+        </Grid>
+
+        <!-- Faixa de progresso e resultado da sincronização -->
+        <Border x:Name="BannerSincronizacao" Grid.Row="1" Margin="0,14,0,0" Padding="14,10"
+                CornerRadius="6" BorderThickness="1" Style="{StaticResource FaixaSincronizacao}"
+                Visibility="{Binding TemMensagemSincronizacao, Converter={StaticResource BoolToVisibilityConverter}}">
+            <StackPanel>
+                <ProgressBar x:Name="BarraSincronizacao" IsIndeterminate="True" Height="4" Margin="0,0,0,8"
+                             Visibility="{Binding Sincronizando, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                <TextBlock x:Name="TextoSincronizacao" FontSize="13" FontWeight="SemiBold"
+                           Style="{StaticResource TextoFaixaSincronizacao}"
+                           Text="{Binding MensagemSincronizacao}"/>
+                <TextBlock x:Name="RodapeSincronizacao" FontSize="11" Margin="0,4,0,0" Opacity="0.8"
+                           Style="{StaticResource TextoFaixaSincronizacao}"
+                           Text="{Binding RodapeSincronizacao}"
+                           Visibility="{Binding TemRodapeSincronizacao, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                <Expander x:Name="DetalhesExecucao" Header="Detalhes da execução" Margin="0,8,0,0" FontSize="12"
+                          Visibility="{Binding TemDetalhesSincronizacao, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <TextBox IsReadOnly="True" Margin="0,6,0,0" FontFamily="Consolas" FontSize="11"
+                             MaxHeight="150" TextWrapping="NoWrap" Background="White"
+                             VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
+                             Text="{Binding DetalhesSincronizacao, Mode=OneWay}"/>
+                </Expander>
+            </StackPanel>
+        </Border>
+
+        <Border Grid.Row="2" Style="{StaticResource Card}" Padding="15" Margin="0,14,0,0">
+            <TextBox x:Name="CampoBusca" Style="{StaticResource TextBoxFiltro}" VerticalAlignment="Center"
+                     helpers:PlaceholderHelper.Text="Buscar por pedido do site, número da venda ou nome do cliente..."
+                     Text="{Binding TermoBusca, UpdateSourceTrigger=PropertyChanged}"/>
+        </Border>
+
+        <Border Grid.Row="3" Style="{StaticResource Card}" Padding="0" Margin="0,14,0,0">
+            <Grid>
+                <DataGrid x:Name="GridVendasSite" Style="{StaticResource DataGridModerno}"
+                          ColumnHeaderStyle="{StaticResource DataGridHeaderModerno}"
+                          ItemsSource="{Binding Vendas}" SelectedItem="{Binding VendaSelecionada}"
+                          AutoGenerateColumns="False" IsReadOnly="True">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Pedido Site" Binding="{Binding PedidoSite, Mode=OneWay}" Width="125" MinWidth="115"/>
+                        <DataGridTextColumn Header="Nº Venda" Binding="{Binding NumeroVenda, Mode=OneWay}" Width="120" MinWidth="110"/>
+                        <DataGridTextColumn Header="Cliente" Binding="{Binding Cliente, Mode=OneWay}" Width="*" MinWidth="130"/>
+                        <DataGridTextColumn Header="Data" Binding="{Binding DataVendaDescricao, Mode=OneWay}" SortMemberPath="DataVenda" Width="125" MinWidth="120"/>
+                        <DataGridTextColumn Header="Total" Binding="{Binding TotalDescricao, Mode=OneWay}" SortMemberPath="Total" Width="95" MinWidth="90"/>
+                        <DataGridTextColumn Header="Pagamento" Binding="{Binding Pagamento, Mode=OneWay}" Width="160" MinWidth="150"/>
+                        <DataGridTextColumn Header="Parcelas" Binding="{Binding ParcelasDescricao, Mode=OneWay}" SortMemberPath="Parcelas" Width="70" MinWidth="65"/>
+                        <DataGridTemplateColumn Header="Status" SortMemberPath="StatusDescricao" Width="115" MinWidth="110">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Border HorizontalAlignment="Center" Padding="8,3" CornerRadius="4">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="Background" Value="#D4EDDA"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding StatusDescricao}" Value="Cancelada">
+                                                        <Setter Property="Background" Value="#F8D7DA"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding StatusDescricao}" Value="Aberta">
+                                                        <Setter Property="Background" Value="#FFF3CD"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding StatusDescricao}" Value="Venda removida">
+                                                        <Setter Property="Background" Value="#E2E3E5"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding StatusDescricao}" Value="Excluída">
+                                                        <Setter Property="Background" Value="#E2E3E5"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        <TextBlock Text="{Binding StatusDescricao}" FontSize="11" FontWeight="SemiBold">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Foreground" Value="#155724"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding StatusDescricao}" Value="Cancelada">
+                                                            <Setter Property="Foreground" Value="#721C24"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding StatusDescricao}" Value="Aberta">
+                                                            <Setter Property="Foreground" Value="#856404"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding StatusDescricao}" Value="Venda removida">
+                                                            <Setter Property="Foreground" Value="#383D41"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding StatusDescricao}" Value="Excluída">
+                                                            <Setter Property="Foreground" Value="#383D41"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </Border>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTextColumn Header="Sincronizado em" Binding="{Binding SincronizadoEmDescricao, Mode=OneWay}" SortMemberPath="SincronizadoEm" Width="125" MinWidth="120"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+
+                <!-- Estado vazio: nenhuma venda do site chegou ainda (sem erro e com a integração no ar). -->
+                <StackPanel x:Name="EstadoVazio" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="30"
+                            Visibility="{Binding MostrarEstadoVazio, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <TextBlock Text="🌐" FontSize="40" HorizontalAlignment="Center"/>
+                    <TextBlock Text="Nenhuma venda do site foi sincronizada ainda" FontSize="16" FontWeight="SemiBold"
+                               HorizontalAlignment="Center" Margin="0,10,0,6" TextWrapping="Wrap" TextAlignment="Center"/>
+                    <TextBlock MaxWidth="460" TextWrapping="Wrap" TextAlignment="Center"
+                               Foreground="{StaticResource CinzaTextoBrush}"
+                               Text="Quando um pedido pago no site chegar à loja, ele aparece aqui. Clique em “Sincronizar com o Site” para buscar agora."/>
+                </StackPanel>
+
+                <!-- Erro ao carregar a lista -->
+                <StackPanel x:Name="EstadoErro" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="30"
+                            Visibility="{Binding MostrarEstadoErro, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <TextBlock Text="⚠" FontSize="36" HorizontalAlignment="Center" Foreground="{StaticResource VermelhoErroBrush}"/>
+                    <TextBlock Text="Não foi possível carregar as vendas do site" FontSize="16" FontWeight="SemiBold"
+                               HorizontalAlignment="Center" Margin="0,10,0,6" TextWrapping="Wrap" TextAlignment="Center"/>
+                    <TextBlock MaxWidth="520" TextWrapping="Wrap" TextAlignment="Center"
+                               Foreground="{StaticResource CinzaTextoBrush}" Text="{Binding MensagemErroCarga}"/>
+                    <Button Style="{StaticResource BotaoSecundario}" Command="{Binding CarregarCommand}"
+                            Content="Tentar novamente" HorizontalAlignment="Center" Margin="0,14,0,0"/>
+                </StackPanel>
+
+                <!-- Integração não instalada / sem permissão -->
+                <StackPanel x:Name="EstadoIntegracao" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="30"
+                            Visibility="{Binding MostrarIntegracaoIndisponivel, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <TextBlock Text="🔌" FontSize="40" HorizontalAlignment="Center"/>
+                    <TextBlock Text="Integração com o site indisponível" FontSize="16" FontWeight="SemiBold"
+                               HorizontalAlignment="Center" Margin="0,10,0,6" TextWrapping="Wrap" TextAlignment="Center"/>
+                    <TextBlock MaxWidth="520" TextWrapping="Wrap" TextAlignment="Center"
+                               Foreground="{StaticResource CinzaTextoBrush}" Text="{Binding MensagemIntegracao}"/>
+                </StackPanel>
+
+                <!-- Carregando -->
+                <Border x:Name="EstadoCarregando" Background="#CCFFFFFF"
+                        Visibility="{Binding MostrarCarregando, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <ProgressBar IsIndeterminate="True" Width="220" Height="4"/>
+                        <TextBlock Text="Carregando vendas do site..." Margin="0,10,0,0" HorizontalAlignment="Center"
+                                   Foreground="{StaticResource CinzaTextoBrush}"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Border>
+
+        <Border Grid.Row="4" Style="{StaticResource Card}" Padding="12,8" Margin="0,10,0,0">
+            <Grid>
+                <TextBlock VerticalAlignment="Center" Foreground="{StaticResource CinzaTextoBrush}"
+                           Text="{Binding InfoPaginacao}"/>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Style="{StaticResource BotaoSecundario}" Content="◀ Anterior"
+                            Command="{Binding PaginaAnteriorCommand}" Margin="0,0,8,0"/>
+                    <Button Style="{StaticResource BotaoSecundario}" Content="Próxima ▶"
+                            Command="{Binding PaginaProximaCommand}"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

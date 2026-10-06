@@ -303,6 +303,24 @@ public partial class MainWindow : Window
 
 
 
+    private void BtnVendasSite_Click(object sender, RoutedEventArgs e)
+
+    {
+
+        DefinirMenuAtivo(BtnVendasSite);
+
+        TxtTituloPagina.Text = "Vendas do Site";
+
+        var vm = ObterServicosPagina().GetRequiredService<VendasSiteViewModel>();
+
+        ConteudoPrincipal.Content = new VendasSiteView(vm);
+
+        _ = vm.CarregarAsync();
+
+    }
+
+
+
     private void BtnPDV_Click(object sender, RoutedEventArgs e) => AbrirPdvComFoco();
 
 

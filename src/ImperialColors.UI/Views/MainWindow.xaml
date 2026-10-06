@@ -80,6 +80,14 @@
                                 </StackPanel>
                             </Button>
 
+                            <Button x:Name="BtnVendasSite" Style="{StaticResource MenuButton}"
+                                    Click="BtnVendasSite_Click">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#x1F310;" FontSize="14" Margin="0,0,12,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="Vendas Site" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+
                             <Button x:Name="BtnPDV" Style="{StaticResource MenuButtonDestaque}"
                                     Click="BtnPDV_Click">
                                 <StackPanel Orientation="Horizontal">
