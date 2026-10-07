@@ -166,20 +166,26 @@ public sealed class SincronizacaoSiteService : ISincronizacaoSiteService
         }
 
         var codigo = processo.ExitCode;
-        var (status, mensagem) = SincronizacaoSiteMensagens.InterpretarCodigoSaida(codigo);
+        var linhas = saida.Linhas();
+        // "O programa terminou com 0" não basta para dizer "sucesso": o resumo do estoque mostra se
+        // o site reconheceu os produtos. Quem classifica é o ImperialSync (códigos 14 e 15); a
+        // leitura do resumo traz os números e é a segunda verificação.
+        var resumo = ResumoEstoqueSiteLeitor.Ler(linhas);
+        var (status, mensagem) = SincronizacaoSiteMensagens.Interpretar(codigo, resumo);
         if (codigo == 2 && !File.Exists(Path.Combine(Path.GetDirectoryName(caminho) ?? string.Empty, SincronizacaoSiteOptions.NomeArquivoConfiguracao)))
             mensagem += $" O arquivo {SincronizacaoSiteOptions.NomeArquivoConfiguracao} não foi encontrado ao lado do ImperialSync.exe.";
 
         _logger?.LogInformation(
-            "ImperialSync terminou com código {Codigo} em {Segundos:N1} s ({Status}).",
-            codigo, relogio.Elapsed.TotalSeconds, status);
+            "ImperialSync terminou com código {Codigo} em {Segundos:N1} s ({Status}). Estoque: {Recebidos} recebidos, {Atualizados} atualizados, {SemCadastro} sem cadastro no site.",
+            codigo, relogio.Elapsed.TotalSeconds, status, resumo?.Recebidos, resumo?.Atualizados, resumo?.SemCadastro);
 
         return new ResultadoSincronizacaoSite
         {
             Status = status,
             CodigoSaida = codigo,
             Mensagem = mensagem,
-            Detalhes = saida.Linhas(),
+            Detalhes = linhas,
+            ResumoEstoque = resumo,
             Duracao = relogio.Elapsed,
             ProcessoExecutado = true
         };

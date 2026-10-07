@@ -4,6 +4,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using ImperialColors.Application.DTOs;
+using ImperialColors.Application.Helpers;
 using ImperialColors.Application.Interfaces;
 using ImperialColors.Domain.ReadModels;
 using ImperialColors.UI.ViewModels;
@@ -310,6 +311,170 @@ public class VendasSiteViewTests
         await m.Vm.SincronizarAsync();
 
         Assert.Equal(Color.FromRgb(0xFF, 0xF3, 0xCD), CorDoFundo(m.Achar<Border>("BannerSincronizacao")));
+    }
+
+    // "A API aceitou" não é "sincronizou": produto da loja sem cadastro no site é faixa AMARELA.
+
+    private static ResultadoSincronizacaoSite DoImperialSync(int codigo, ResumoEstoqueSite? resumo)
+    {
+        var (status, mensagem) = SincronizacaoSiteMensagens.Interpretar(codigo, resumo);
+        return new ResultadoSincronizacaoSite
+        {
+            Status = status, CodigoSaida = codigo, Mensagem = mensagem, ProcessoExecutado = true, ResumoEstoque = resumo
+        };
+    }
+
+    private static readonly Color Amarelo = Color.FromRgb(0xFF, 0xF3, 0xCD);
+    private static readonly Color Verde = Color.FromRgb(0xD4, 0xED, 0xDA);
+    private static readonly Color Vermelho = Color.FromRgb(0xF8, 0xD7, 0xDA);
+    private static readonly Color TextoDeAlerta = Color.FromRgb(0x85, 0x64, 0x04);
+
+    [WpfTheory]
+    [InlineData(14)]  // ImperialSync atual
+    [InlineData(0)]   // ImperialSync antigo: saía com 0 e a faixa ficava verde
+    public async Task NenhumSkuReconhecido_FaixaAmarela_ComNumerosAmostraEOrientacao(int codigo)
+    {
+        var m = new Montagem();
+        m.Sincronizacao
+            .Setup(s => s.SincronizarAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(DoImperialSync(codigo, new ResumoEstoqueSite
+            {
+                Recebidos = 222, Atualizados = 0, SemCadastro = 222, AmostraSemCadastro = ["21201050", "301010001", "DIL001"]
+            }));
+
+        await m.Vm.SincronizarAsync();
+
+        Assert.Equal(Amarelo, CorDoFundo(m.Achar<Border>("BannerSincronizacao")));
+        Assert.Equal(
+            "Sincronização concluída com alerta. 222 produtos foram enviados, mas nenhum SKU foi encontrado no catálogo do site.",
+            m.Achar<TextBlock>("TextoSincronizacao").Text);
+
+        var resumo = m.Achar<TextBlock>("ResumoEstoqueSincronizacao");
+        var amostra = m.Achar<TextBlock>("AmostraSemCadastroSincronizacao");
+        var orientacao = m.Achar<TextBlock>("OrientacaoEstoqueSincronizacao");
+        Assert.All(new[] { resumo, amostra, orientacao }, linha =>
+        {
+            Assert.Equal(Visibility.Visible, linha.Visibility);
+            Assert.Equal(TextoDeAlerta, ((SolidColorBrush)linha.Foreground).Color);
+            Assert.Equal(TextWrapping.Wrap, linha.TextWrapping);
+        });
+        Assert.Equal("Recebidos pelo site: 222  ·  Atualizados: 0  ·  SKUs sem cadastro: 222", resumo.Text);
+        Assert.Equal("Exemplos de SKUs sem cadastro (3 de 222): 21201050, 301010001, DIL001", amostra.Text);
+        Assert.Contains("cadastre-os no site com o SKU igual ao Código do Produto", orientacao.Text);
+        // Terminou: nada de barra de progresso e o botão volta.
+        Assert.Equal(Visibility.Collapsed, m.Visibilidade("BarraSincronizacao"));
+        Assert.True(m.Achar<Button>("BtnSincronizar").Command.CanExecute(null));
+    }
+
+    [WpfFact]
+    public async Task ParteDosSkusSemCadastro_FaixaAmarela_ComAContaParcial()
+    {
+        var m = new Montagem();
+        m.Sincronizacao
+            .Setup(s => s.SincronizarAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(DoImperialSync(15, new ResumoEstoqueSite
+            {
+                Recebidos = 222, Atualizados = 200, SemCadastro = 22, AmostraSemCadastro = ["P00201", "P00202"]
+            }));
+
+        await m.Vm.SincronizarAsync();
+
+        Assert.Equal(Amarelo, CorDoFundo(m.Achar<Border>("BannerSincronizacao")));
+        Assert.Equal(
+            "Sincronização concluída com alerta. 22 dos 222 produtos enviados não têm cadastro no catálogo do site.",
+            m.Achar<TextBlock>("TextoSincronizacao").Text);
+        Assert.Equal(
+            "Recebidos pelo site: 222  ·  Atualizados: 200  ·  SKUs sem cadastro: 22",
+            m.Achar<TextBlock>("ResumoEstoqueSincronizacao").Text);
+        Assert.Equal(Visibility.Visible, m.Visibilidade("AmostraSemCadastroSincronizacao"));
+        Assert.Equal(Visibility.Visible, m.Visibilidade("OrientacaoEstoqueSincronizacao"));
+    }
+
+    [WpfFact]
+    public async Task TodosOsSkusReconhecidos_FaixaVerde_SoComOsNumeros()
+    {
+        var m = new Montagem();
+        m.Sincronizacao
+            .Setup(s => s.SincronizarAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(DoImperialSync(0, new ResumoEstoqueSite { Recebidos = 222, Atualizados = 222, SemCadastro = 0 }));
+
+        await m.Vm.SincronizarAsync();
+
+        Assert.Equal(Verde, CorDoFundo(m.Achar<Border>("BannerSincronizacao")));
+        Assert.Equal("Sincronização concluída com sucesso.", m.Achar<TextBlock>("TextoSincronizacao").Text);
+        Assert.Equal(Visibility.Visible, m.Visibilidade("ResumoEstoqueSincronizacao"));
+        Assert.Equal(
+            "Recebidos pelo site: 222  ·  Atualizados: 222  ·  SKUs sem cadastro: 0",
+            m.Achar<TextBlock>("ResumoEstoqueSincronizacao").Text);
+        Assert.Equal(Visibility.Collapsed, m.Visibilidade("AmostraSemCadastroSincronizacao"));
+        Assert.Equal(Visibility.Collapsed, m.Visibilidade("OrientacaoEstoqueSincronizacao"));
+    }
+
+    [WpfTheory]
+    [InlineData(4)]
+    [InlineData(5)]
+    [InlineData(6)]
+    [InlineData(12)]
+    public async Task FalhaDeBancoHttpOuAssinatura_FaixaVermelha_SemLinhasDeEstoque(int codigo)
+    {
+        var m = new Montagem();
+        m.Sincronizacao
+            .Setup(s => s.SincronizarAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(DoImperialSync(codigo, null));
+
+        await m.Vm.SincronizarAsync();
+
+        Assert.Equal(Vermelho, CorDoFundo(m.Achar<Border>("BannerSincronizacao")));
+        Assert.Equal(Visibility.Collapsed, m.Visibilidade("ResumoEstoqueSincronizacao"));
+        Assert.Equal(Visibility.Collapsed, m.Visibilidade("AmostraSemCadastroSincronizacao"));
+        Assert.Equal(Visibility.Collapsed, m.Visibilidade("OrientacaoEstoqueSincronizacao"));
+    }
+
+    [WpfFact]
+    public async Task SemResumoDoEstoque_AsLinhasDeEstoqueNaoOcupamEspaco()
+    {
+        var m = new Montagem();
+
+        await m.Vm.SincronizarAsync();
+
+        Assert.Equal(Verde, CorDoFundo(m.Achar<Border>("BannerSincronizacao")));
+        Assert.Equal(Visibility.Collapsed, m.Visibilidade("ResumoEstoqueSincronizacao"));
+        Assert.Equal(Visibility.Collapsed, m.Visibilidade("AmostraSemCadastroSincronizacao"));
+        Assert.Equal(Visibility.Collapsed, m.Visibilidade("OrientacaoEstoqueSincronizacao"));
+    }
+
+    [WpfTheory]
+    [InlineData(794)]   // janela de 1024 px (mínima) menos o menu lateral
+    [InlineData(1136)]
+    [InlineData(1690)]
+    public async Task FaixaDeAlertaComAmostraLonga_QuebraALinha_ENaoPassaDaLargura(double largura)
+    {
+        var m = new Montagem(Pagina(1, Venda("IC-2026-000001", "20261006-0001")));
+        await m.Vm.CarregarAsync();
+        // Dez códigos de 40 caracteres: bem mais largo que qualquer janela.
+        var codigos = Enumerable.Range(1, 10).Select(n => $"CODIGO-DE-PRODUTO-BEM-COMPRIDO-NUMERO-{n:0000}").ToArray();
+        m.Sincronizacao
+            .Setup(s => s.SincronizarAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(DoImperialSync(14, new ResumoEstoqueSite
+            {
+                Recebidos = 1209, Atualizados = 0, SemCadastro = 1209, AmostraSemCadastro = codigos
+            }));
+        await m.Vm.SincronizarAsync();
+
+        m.Medir(largura);
+
+        var faixa = m.Achar<Border>("BannerSincronizacao");
+        var amostra = m.Achar<TextBlock>("AmostraSemCadastroSincronizacao");
+        Assert.True(faixa.ActualWidth <= largura - 60 + 0.5, $"a faixa passa da janela: {faixa.ActualWidth:F0}");
+        Assert.True(amostra.ActualWidth <= faixa.ActualWidth, "a amostra sai da faixa");
+        // Mais de uma linha de texto: quebrou em vez de cortar ou empurrar a tela.
+        Assert.True(amostra.ActualHeight > amostra.FontSize * 2, $"a amostra não quebrou a linha ({amostra.ActualHeight:F0})");
+        foreach (var nome in new[] { "TextoSincronizacao", "ResumoEstoqueSincronizacao", "OrientacaoEstoqueSincronizacao" })
+        {
+            var linha = m.Achar<TextBlock>(nome);
+            Assert.True(linha.ActualWidth <= faixa.ActualWidth, $"{nome} sai da faixa");
+            Assert.True(linha.ActualHeight > 0, $"{nome} não foi desenhado");
+        }
     }
 
     [WpfFact]

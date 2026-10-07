@@ -144,6 +144,8 @@ public class SincronizacaoSiteServiceTests
     [InlineData(11, StatusSincronizacaoSite.Falhou)]
     [InlineData(12, StatusSincronizacaoSite.Falhou)]
     [InlineData(13, StatusSincronizacaoSite.JaEmExecucao)]
+    [InlineData(14, StatusSincronizacaoSite.ConcluidaComAtencao)]
+    [InlineData(15, StatusSincronizacaoSite.ConcluidaComAtencao)]
     [InlineData(77, StatusSincronizacaoSite.Falhou)]
     public async Task CodigoDeSaida_ViraOStatusEAMensagemDoContrato(int codigo, StatusSincronizacaoSite esperado)
     {
@@ -178,6 +180,176 @@ public class SincronizacaoSiteServiceTests
 
         Assert.DoesNotContain("não foi encontrado", resultado.Mensagem);
         Assert.Contains("configuração do ImperialSync é inválida", resultado.Mensagem);
+    }
+
+    // ---------------------------------------------------------------------------------------
+    // Estoque: "a API aceitou" não é "sincronizou" — produto sem cadastro no site é ALERTA
+    // ---------------------------------------------------------------------------------------
+
+    /// <summary>O que o ImperialSync escreve ao final da rodada de estoque (texto real do programa).</summary>
+    private static string ScriptDoResumo(string titulo, int recebidos, int atualizados, int desconhecidos, string? exemplos, int codigo, string? frase = null)
+        => string.Join('\n', new[]
+        {
+            "chcp 65001 >nul",
+            "echo Imperial Colors - Sincronização",
+            "echo Banco local: conectado",
+            $"echo Produtos encontrados: {recebidos}",
+            "echo Lotes: 1",
+            "echo Sincronizando lote 1/1...",
+            $"echo {titulo}",
+            frase is null ? null : $"echo {frase}",
+            $"echo Recebidos: {recebidos}",
+            $"echo Atualizados: {atualizados}",
+            $"echo SKUs desconhecidos: {desconhecidos}",
+            // "echo" + 3 espaços: o primeiro separa o comando; ficam os dois do recuo real.
+            exemplos is null ? null : $"echo   Exemplos (produtos da loja sem cadastro no site): {exemplos}",
+            "echo Duração: 0,1 s",
+            $"exit /b {codigo}"
+        }.Where(linha => linha is not null));
+
+    [Fact]
+    public async Task Recebidos222_Atualizados0_Desconhecidos222_EhAlerta_NaoSucesso()
+    {
+        using var programa = new ProgramaDeTeste(ScriptDoResumo(
+            "Sincronização concluída com alerta.", 222, 0, 222, "21201050, 301010001, DIL001", codigo: 14,
+            frase: "222 produtos foram enviados, mas nenhum SKU foi encontrado no catálogo do site."));
+
+        var resultado = await Criar(programa).SincronizarAsync();
+
+        Assert.Equal(StatusSincronizacaoSite.ConcluidaComAtencao, resultado.Status);
+        Assert.False(resultado.Sucesso);
+        Assert.Equal(14, resultado.CodigoSaida);
+        Assert.Equal(
+            "Sincronização concluída com alerta. 222 produtos foram enviados, mas nenhum SKU foi encontrado no catálogo do site.",
+            resultado.Mensagem);
+        Assert.NotNull(resultado.ResumoEstoque);
+        Assert.Equal((222, 0, 222), (resultado.ResumoEstoque.Recebidos, resultado.ResumoEstoque.Atualizados, resultado.ResumoEstoque.SemCadastro));
+        Assert.Equal(["21201050", "301010001", "DIL001"], resultado.ResumoEstoque.AmostraSemCadastro);
+        Assert.True(resultado.ResumoEstoque.NenhumReconhecido);
+        // Terminou e pode ter criado vendas: a tela recarrega a lista normalmente.
+        Assert.True(resultado.ProcessoExecutado);
+        Assert.Contains("  Exemplos (produtos da loja sem cadastro no site): 21201050, 301010001, DIL001", resultado.Detalhes);
+    }
+
+    [Fact]
+    public async Task Recebidos222_Atualizados200_Desconhecidos22_EhAlertaParcial()
+    {
+        using var programa = new ProgramaDeTeste(ScriptDoResumo(
+            "Sincronização concluída com alerta.", 222, 200, 22, "P00201, P00202", codigo: 15,
+            frase: "22 dos 222 produtos enviados não têm cadastro no catálogo do site."));
+
+        var resultado = await Criar(programa).SincronizarAsync();
+
+        Assert.Equal(StatusSincronizacaoSite.ConcluidaComAtencao, resultado.Status);
+        Assert.False(resultado.Sucesso);
+        Assert.Equal(15, resultado.CodigoSaida);
+        Assert.Equal(
+            "Sincronização concluída com alerta. 22 dos 222 produtos enviados não têm cadastro no catálogo do site.",
+            resultado.Mensagem);
+        Assert.NotNull(resultado.ResumoEstoque);
+        Assert.Equal((222, 200, 22), (resultado.ResumoEstoque.Recebidos, resultado.ResumoEstoque.Atualizados, resultado.ResumoEstoque.SemCadastro));
+        Assert.False(resultado.ResumoEstoque.NenhumReconhecido);
+    }
+
+    [Fact]
+    public async Task Recebidos222_TodosReconhecidos_EhSucesso_ComOsNumeros()
+    {
+        using var programa = new ProgramaDeTeste(ScriptDoResumo("Sincronização concluída.", 222, 222, 0, exemplos: null, codigo: 0));
+
+        var resultado = await Criar(programa).SincronizarAsync();
+
+        Assert.Equal(StatusSincronizacaoSite.Concluida, resultado.Status);
+        Assert.True(resultado.Sucesso);
+        Assert.Equal("Sincronização concluída com sucesso.", resultado.Mensagem);
+        Assert.NotNull(resultado.ResumoEstoque);
+        Assert.Equal((222, 222, 0), (resultado.ResumoEstoque.Recebidos, resultado.ResumoEstoque.Atualizados, resultado.ResumoEstoque.SemCadastro));
+        Assert.Empty(resultado.ResumoEstoque.AmostraSemCadastro);
+    }
+
+    [Theory]
+    [InlineData(222, 0, 222, "nenhum SKU foi encontrado")]
+    [InlineData(222, 200, 22, "22 dos 222 produtos enviados não têm cadastro")]
+    public async Task ImperialSyncAntigo_QueTerminaComZeroMesmoSemReconhecer_NaoPassaComoSucesso(
+        int recebidos, int atualizados, int desconhecidos, string trecho)
+    {
+        // A versão 1.1.0 dizia "Sincronização concluída." e saía com 0 neste cenário: o falso positivo.
+        using var programa = new ProgramaDeTeste(ScriptDoResumo(
+            "Sincronização concluída.", recebidos, atualizados, desconhecidos, "A-1, B-2", codigo: 0));
+
+        var resultado = await Criar(programa).SincronizarAsync();
+
+        Assert.Equal(StatusSincronizacaoSite.ConcluidaComAtencao, resultado.Status);
+        Assert.False(resultado.Sucesso);
+        Assert.Equal(0, resultado.CodigoSaida);
+        Assert.StartsWith("Sincronização concluída com alerta.", resultado.Mensagem);
+        Assert.Contains(trecho, resultado.Mensagem);
+    }
+
+    [Theory]
+    [InlineData(4, "banco de dados da loja")]   // banco
+    [InlineData(5, "recusou")]                   // assinatura (HMAC) / 401 / 403
+    [InlineData(6, "indisponível")]              // HTTP fora do ar
+    [InlineData(12, "assinatura inválida")]      // resposta sem assinatura válida
+    public async Task FalhaDeBancoHttpOuAssinatura_EhErro_MesmoQueOProgramaTenhaEscritoUmResumo(int codigo, string trecho)
+    {
+        // Rodada em que as vendas falharam depois de o estoque ter sido enviado (com produtos sem
+        // cadastro): o que o operador precisa ver é a FALHA, não um "concluída com alerta".
+        using var programa = new ProgramaDeTeste(ScriptDoResumo(
+            "Sincronização concluída com alerta.", 222, 0, 222, "A-1, B-2", codigo,
+            frase: "222 produtos foram enviados, mas nenhum SKU foi encontrado no catálogo do site."));
+
+        var resultado = await Criar(programa).SincronizarAsync();
+
+        Assert.Equal(StatusSincronizacaoSite.Falhou, resultado.Status);
+        Assert.False(resultado.Sucesso);
+        Assert.Contains(trecho, resultado.Mensagem);
+        Assert.DoesNotContain("concluída", resultado.Mensagem);
+        // Os números continuam disponíveis para a tela mostrar.
+        Assert.NotNull(resultado.ResumoEstoque);
+    }
+
+    [Fact]
+    public async Task FalhaAntesDoResumo_EhErro_SemNumerosInventados()
+    {
+        using var programa = new ProgramaDeTeste("""
+            chcp 65001 >nul
+            echo Sincronizando lote 1/1...
+            echo Falha no lote 1/1: a API respondeu HTTP 503. 1>&2
+            echo Sincronização NÃO concluída. 1>&2
+            exit /b 6
+            """);
+
+        var resultado = await Criar(programa).SincronizarAsync();
+
+        Assert.Equal(StatusSincronizacaoSite.Falhou, resultado.Status);
+        Assert.Null(resultado.ResumoEstoque);
+        Assert.Contains("Sincronização NÃO concluída.", resultado.Detalhes);
+    }
+
+    [Fact]
+    public async Task CodigoDeAlertaSemAsLinhasDoResumo_AindaEhAlerta()
+    {
+        using var programa = new ProgramaDeTeste("exit /b 14");
+
+        var resultado = await Criar(programa).SincronizarAsync();
+
+        Assert.Equal(StatusSincronizacaoSite.ConcluidaComAtencao, resultado.Status);
+        Assert.Null(resultado.ResumoEstoque);
+        Assert.Contains("nenhum SKU foi encontrado no catálogo do site", resultado.Mensagem);
+    }
+
+    [Fact]
+    public async Task VendasComAtencaoEProdutosSemCadastro_OsDoisAlertasNaMensagem()
+    {
+        using var programa = new ProgramaDeTeste(ScriptDoResumo(
+            "Sincronização concluída com alerta.", 222, 200, 22, "P00201", codigo: 10,
+            frase: "22 dos 222 produtos enviados não têm cadastro no catálogo do site."));
+
+        var resultado = await Criar(programa).SincronizarAsync();
+
+        Assert.Equal(StatusSincronizacaoSite.ConcluidaComAtencao, resultado.Status);
+        Assert.Contains("vendas do site que precisam de atenção", resultado.Mensagem);
+        Assert.Contains("22 dos 222 produtos enviados não têm cadastro", resultado.Mensagem);
     }
 
     // ---------------------------------------------------------------------------------------

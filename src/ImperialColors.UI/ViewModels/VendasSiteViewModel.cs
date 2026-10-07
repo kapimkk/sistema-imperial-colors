@@ -224,6 +224,48 @@ public class VendasSiteViewModel : BaseViewModel
 
     public bool TemDetalhesSincronizacao => !string.IsNullOrEmpty(DetalhesSincronizacao);
 
+    // O que o site fez com o estoque desta rodada: os três números, alguns dos códigos sem
+    // cadastro e o que fazer com eles. Os textos vêm prontos de SincronizacaoSiteMensagens.
+
+    private string _resumoEstoque = string.Empty;
+    public string ResumoEstoque
+    {
+        get => _resumoEstoque;
+        private set
+        {
+            SetProperty(ref _resumoEstoque, value);
+            OnPropertyChanged(nameof(TemResumoEstoque));
+        }
+    }
+
+    public bool TemResumoEstoque => !string.IsNullOrEmpty(ResumoEstoque);
+
+    private string _amostraSemCadastro = string.Empty;
+    public string AmostraSemCadastro
+    {
+        get => _amostraSemCadastro;
+        private set
+        {
+            SetProperty(ref _amostraSemCadastro, value);
+            OnPropertyChanged(nameof(TemAmostraSemCadastro));
+        }
+    }
+
+    public bool TemAmostraSemCadastro => !string.IsNullOrEmpty(AmostraSemCadastro);
+
+    private string _orientacaoEstoque = string.Empty;
+    public string OrientacaoEstoque
+    {
+        get => _orientacaoEstoque;
+        private set
+        {
+            SetProperty(ref _orientacaoEstoque, value);
+            OnPropertyChanged(nameof(TemOrientacaoEstoque));
+        }
+    }
+
+    public bool TemOrientacaoEstoque => !string.IsNullOrEmpty(OrientacaoEstoque);
+
     public AsyncRelayCommand CarregarCommand { get; }
     public AsyncRelayCommand SincronizarCommand { get; }
     public AsyncRelayCommand PaginaAnteriorCommand { get; }
@@ -445,6 +487,17 @@ public class VendasSiteViewModel : BaseViewModel
 
         DefinirMensagem(gravidade, resultado.Mensagem);
 
+        // Os números e a amostra aparecem sempre que o programa os escreveu. A orientação ("cadastre
+        // no site...") só no alerta: numa falha, o que o operador precisa resolver primeiro é a falha.
+        var resumo = resultado.ResumoEstoque;
+        ResumoEstoque = resumo is null ? string.Empty : SincronizacaoSiteMensagens.DescreverResumo(resumo);
+        AmostraSemCadastro = resumo is null ? string.Empty : SincronizacaoSiteMensagens.DescreverAmostra(resumo);
+        OrientacaoEstoque =
+            resultado.Status == StatusSincronizacaoSite.ConcluidaComAtencao
+            && SincronizacaoSiteMensagens.HaProdutoSemCadastro(resultado.CodigoSaida, resumo)
+                ? SincronizacaoSiteMensagens.OrientacaoSemCadastro
+                : string.Empty;
+
         DetalhesSincronizacao = string.Join(
             Environment.NewLine,
             resultado.Detalhes.TakeLast(MaximoLinhasDetalhe));
@@ -466,6 +519,9 @@ public class VendasSiteViewModel : BaseViewModel
         {
             DetalhesSincronizacao = string.Empty;
             RodapeSincronizacao = string.Empty;
+            ResumoEstoque = string.Empty;
+            AmostraSemCadastro = string.Empty;
+            OrientacaoEstoque = string.Empty;
         }
     }
 

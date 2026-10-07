@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using ImperialColors.Application.DTOs;
+using ImperialColors.Application.Helpers;
 using ImperialColors.Application.Interfaces;
 using ImperialColors.Domain.ReadModels;
 using ImperialColors.UI.ViewModels;
@@ -95,15 +96,33 @@ public class VendasSiteViewModelTests
 
     private static ResultadoSincronizacaoSite Resultado(
         StatusSincronizacaoSite status, int? codigo, string mensagem,
-        bool executado = true, IReadOnlyList<string>? detalhes = null, double segundos = 0.6) => new()
+        bool executado = true, IReadOnlyList<string>? detalhes = null, double segundos = 0.6,
+        ResumoEstoqueSite? resumo = null) => new()
     {
         Status = status,
         CodigoSaida = codigo,
         Mensagem = mensagem,
         ProcessoExecutado = executado,
         Detalhes = detalhes ?? [],
-        Duracao = TimeSpan.FromSeconds(segundos)
+        Duracao = TimeSpan.FromSeconds(segundos),
+        ResumoEstoque = resumo
     };
+
+    private static ResumoEstoqueSite Resumo(int recebidos, int atualizados, int semCadastro, params string[] amostra) => new()
+    {
+        Recebidos = recebidos,
+        Atualizados = atualizados,
+        SemCadastro = semCadastro,
+        AmostraSemCadastro = amostra
+    };
+
+    /// <summary>O resultado como o serviço o monta: status e mensagem saem do código de saída e do
+    /// resumo do estoque, pela mesma regra do programa (SincronizacaoSiteMensagens.Interpretar).</summary>
+    private static ResultadoSincronizacaoSite DoImperialSync(int codigo, ResumoEstoqueSite? resumo)
+    {
+        var (status, mensagem) = SincronizacaoSiteMensagens.Interpretar(codigo, resumo);
+        return Resultado(status, codigo, mensagem, resumo: resumo);
+    }
 
     // ---------------------------------------------------------------------------------------
     // Carregamento e estados da lista
@@ -390,6 +409,170 @@ public class VendasSiteViewModelTests
         Assert.Equal(executado ? cargasAntes + 1 : cargasAntes, c.Cargas);
         Assert.False(c.Vm.Sincronizando);
         Assert.Equal(executado, c.Vm.TemRodapeSincronizacao);
+    }
+
+    // ---------------------------------------------------------------------------------------
+    // Estoque: produto sem cadastro no site é ALERTA (amarelo), nunca sucesso (verde) nem erro
+    // ---------------------------------------------------------------------------------------
+
+    [WpfTheory]
+    [InlineData(14)]  // ImperialSync atual
+    [InlineData(0)]   // ImperialSync antigo, que terminava com 0 neste cenário
+    public async Task Recebidos222_Atualizados0_SemCadastro222_FaixaDeAlerta_ComNumerosAmostraEOrientacao(int codigo)
+    {
+        var c = new Cenario(Pagina(0));
+        await c.Vm.CarregarAsync();
+        c.SincronizacaoDevolve(DoImperialSync(codigo, Resumo(222, 0, 222, "21201050", "301010001", "DIL001")));
+        var cargasAntes = c.Cargas;
+
+        await c.Vm.SincronizarAsync();
+
+        Assert.Equal(GravidadeSincronizacao.Atencao, c.Vm.GravidadeSincronizacao);
+        Assert.Equal(
+            "Sincronização concluída com alerta. 222 produtos foram enviados, mas nenhum SKU foi encontrado no catálogo do site.",
+            c.Vm.MensagemSincronizacao);
+        Assert.True(c.Vm.TemResumoEstoque);
+        Assert.Equal("Recebidos pelo site: 222  ·  Atualizados: 0  ·  SKUs sem cadastro: 222", c.Vm.ResumoEstoque);
+        Assert.True(c.Vm.TemAmostraSemCadastro);
+        Assert.Equal("Exemplos de SKUs sem cadastro (3 de 222): 21201050, 301010001, DIL001", c.Vm.AmostraSemCadastro);
+        Assert.True(c.Vm.TemOrientacaoEstoque);
+        Assert.Contains("Código do Produto", c.Vm.OrientacaoEstoque);
+        Assert.Contains($"código de saída {codigo}", c.Vm.RodapeSincronizacao);
+        // Não é falha: a lista é recarregada e o botão volta a funcionar.
+        Assert.Equal(cargasAntes + 1, c.Cargas);
+        Assert.False(c.Vm.Sincronizando);
+        Assert.True(c.Vm.SincronizarCommand.CanExecute(null));
+    }
+
+    [WpfFact]
+    public async Task Recebidos222_Atualizados200_SemCadastro22_FaixaDeAlertaParcial()
+    {
+        var c = new Cenario(Pagina(0));
+        await c.Vm.CarregarAsync();
+        c.SincronizacaoDevolve(DoImperialSync(15, Resumo(222, 200, 22, "P00201", "P00202")));
+
+        await c.Vm.SincronizarAsync();
+
+        Assert.Equal(GravidadeSincronizacao.Atencao, c.Vm.GravidadeSincronizacao);
+        Assert.Equal(
+            "Sincronização concluída com alerta. 22 dos 222 produtos enviados não têm cadastro no catálogo do site.",
+            c.Vm.MensagemSincronizacao);
+        Assert.Equal("Recebidos pelo site: 222  ·  Atualizados: 200  ·  SKUs sem cadastro: 22", c.Vm.ResumoEstoque);
+        Assert.Equal("Exemplos de SKUs sem cadastro (2 de 22): P00201, P00202", c.Vm.AmostraSemCadastro);
+        Assert.True(c.Vm.TemOrientacaoEstoque);
+    }
+
+    [WpfFact]
+    public async Task Recebidos222_TodosReconhecidos_FaixaDeSucesso_ComOsNumeros_SemAlerta()
+    {
+        var c = new Cenario(Pagina(0));
+        await c.Vm.CarregarAsync();
+        c.SincronizacaoDevolve(DoImperialSync(0, Resumo(222, 222, 0)));
+
+        await c.Vm.SincronizarAsync();
+
+        Assert.Equal(GravidadeSincronizacao.Sucesso, c.Vm.GravidadeSincronizacao);
+        Assert.Equal("Sincronização concluída com sucesso.", c.Vm.MensagemSincronizacao);
+        Assert.Equal("Recebidos pelo site: 222  ·  Atualizados: 222  ·  SKUs sem cadastro: 0", c.Vm.ResumoEstoque);
+        Assert.False(c.Vm.TemAmostraSemCadastro);
+        Assert.False(c.Vm.TemOrientacaoEstoque);
+    }
+
+    [WpfTheory]
+    [InlineData(4)]   // banco da loja
+    [InlineData(5)]   // API recusou (assinatura/HMAC)
+    [InlineData(6)]   // API indisponível (HTTP)
+    [InlineData(12)]  // resposta sem assinatura válida
+    public async Task FalhaDeBancoHttpOuAssinatura_FaixaDeErro_NuncaAlertaNemSucesso(int codigo)
+    {
+        var c = new Cenario(Pagina(0));
+        await c.Vm.CarregarAsync();
+        c.SincronizacaoDevolve(DoImperialSync(codigo, null));
+
+        await c.Vm.SincronizarAsync();
+
+        Assert.Equal(GravidadeSincronizacao.Erro, c.Vm.GravidadeSincronizacao);
+        Assert.DoesNotContain("concluída", c.Vm.MensagemSincronizacao);
+        Assert.False(c.Vm.TemResumoEstoque);
+        Assert.False(c.Vm.TemAmostraSemCadastro);
+        Assert.False(c.Vm.TemOrientacaoEstoque);
+    }
+
+    [WpfFact]
+    public async Task FalhaComResumoDeProdutosSemCadastro_ContinuaErro_MostraOsNumerosSemAOrientacao()
+    {
+        // As vendas falharam (código 5) depois de o estoque ter ido com produtos sem cadastro.
+        var c = new Cenario(Pagina(0));
+        await c.Vm.CarregarAsync();
+        c.SincronizacaoDevolve(DoImperialSync(5, Resumo(222, 0, 222, "A-1")));
+
+        await c.Vm.SincronizarAsync();
+
+        Assert.Equal(GravidadeSincronizacao.Erro, c.Vm.GravidadeSincronizacao);
+        Assert.Contains("recusou", c.Vm.MensagemSincronizacao);
+        Assert.True(c.Vm.TemResumoEstoque);
+        Assert.True(c.Vm.TemAmostraSemCadastro);
+        // Primeiro a falha: a orientação de cadastro só aparece quando a rodada termina em alerta.
+        Assert.False(c.Vm.TemOrientacaoEstoque);
+    }
+
+    [WpfFact]
+    public async Task AlertaPeloCodigoSemOsNumeros_AindaOrientaOOperador()
+    {
+        var c = new Cenario(Pagina(0));
+        await c.Vm.CarregarAsync();
+        c.SincronizacaoDevolve(DoImperialSync(14, null));
+
+        await c.Vm.SincronizarAsync();
+
+        Assert.Equal(GravidadeSincronizacao.Atencao, c.Vm.GravidadeSincronizacao);
+        Assert.StartsWith("Sincronização concluída com alerta.", c.Vm.MensagemSincronizacao);
+        Assert.False(c.Vm.TemResumoEstoque);
+        Assert.True(c.Vm.TemOrientacaoEstoque);
+    }
+
+    [WpfFact]
+    public async Task NovaSincronizacao_LimpaOResumoDoEstoqueDaAnterior()
+    {
+        var c = new Cenario(Pagina(0));
+        await c.Vm.CarregarAsync();
+        c.SincronizacaoDevolve(DoImperialSync(14, Resumo(222, 0, 222, "A-1")));
+        await c.Vm.SincronizarAsync();
+        Assert.True(c.Vm.TemResumoEstoque);
+
+        // A próxima termina sem resumo (falhou antes de chegar ao estoque): nada da anterior sobra.
+        c.SincronizacaoDevolve(DoImperialSync(6, null));
+        await c.Vm.SincronizarAsync();
+
+        Assert.Equal(GravidadeSincronizacao.Erro, c.Vm.GravidadeSincronizacao);
+        Assert.Equal(string.Empty, c.Vm.ResumoEstoque);
+        Assert.Equal(string.Empty, c.Vm.AmostraSemCadastro);
+        Assert.Equal(string.Empty, c.Vm.OrientacaoEstoque);
+    }
+
+    [WpfFact]
+    public async Task EnquantoSincroniza_OResumoDaRodadaAnteriorNaoFicaNaTela()
+    {
+        var c = new Cenario(Pagina(0));
+        await c.Vm.CarregarAsync();
+        c.SincronizacaoDevolve(DoImperialSync(15, Resumo(222, 200, 22, "A-1")));
+        await c.Vm.SincronizarAsync();
+
+        var emAndamento = new TaskCompletionSource<ResultadoSincronizacaoSite>();
+        c.Sincronizacao.Setup(s => s.SincronizarAsync(It.IsAny<CancellationToken>())).Returns(emAndamento.Task);
+        var execucao = c.Vm.SincronizarAsync();
+
+        Assert.True(c.Vm.Sincronizando);
+        Assert.Equal(GravidadeSincronizacao.Informacao, c.Vm.GravidadeSincronizacao);
+        Assert.False(c.Vm.TemResumoEstoque);
+        Assert.False(c.Vm.TemAmostraSemCadastro);
+        Assert.False(c.Vm.TemOrientacaoEstoque);
+
+        emAndamento.SetResult(DoImperialSync(0, Resumo(222, 222, 0)));
+        await execucao;
+
+        Assert.Equal(GravidadeSincronizacao.Sucesso, c.Vm.GravidadeSincronizacao);
+        Assert.True(c.Vm.TemResumoEstoque);
     }
 
     [WpfFact]

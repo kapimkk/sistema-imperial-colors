@@ -92,6 +92,20 @@
                 <TextBlock x:Name="TextoSincronizacao" FontSize="13" FontWeight="SemiBold"
                            Style="{StaticResource TextoFaixaSincronizacao}"
                            Text="{Binding MensagemSincronizacao}"/>
+                <!-- O que o site fez com o estoque: recebidos, atualizados e sem cadastro; alguns dos
+                     códigos sem cadastro; e o que fazer. Cada linha só aparece quando há o que mostrar. -->
+                <TextBlock x:Name="ResumoEstoqueSincronizacao" FontSize="12" Margin="0,6,0,0"
+                           Style="{StaticResource TextoFaixaSincronizacao}"
+                           Text="{Binding ResumoEstoque}"
+                           Visibility="{Binding TemResumoEstoque, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                <TextBlock x:Name="AmostraSemCadastroSincronizacao" FontSize="12" Margin="0,3,0,0"
+                           Style="{StaticResource TextoFaixaSincronizacao}"
+                           Text="{Binding AmostraSemCadastro}"
+                           Visibility="{Binding TemAmostraSemCadastro, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                <TextBlock x:Name="OrientacaoEstoqueSincronizacao" FontSize="12" Margin="0,3,0,0" FontStyle="Italic"
+                           Style="{StaticResource TextoFaixaSincronizacao}"
+                           Text="{Binding OrientacaoEstoque}"
+                           Visibility="{Binding TemOrientacaoEstoque, Converter={StaticResource BoolToVisibilityConverter}}"/>
                 <TextBlock x:Name="RodapeSincronizacao" FontSize="11" Margin="0,4,0,0" Opacity="0.8"
                            Style="{StaticResource TextoFaixaSincronizacao}"
                            Text="{Binding RodapeSincronizacao}"

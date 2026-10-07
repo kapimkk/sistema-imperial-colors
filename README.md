@@ -695,6 +695,8 @@ Se o IP do servidor mudar, atualiza-se **só o `hosts` do servidor** (ou a reser
   - Roda em segundo plano, **sem travar a tela**; o botão fica bloqueado ("Sincronizando...") e uma segunda execução não é aceita enquanto a primeira não termina (vale também se o operador sair da aba e voltar). Em outro computador da loja, o próprio ImperialSync recusa uma segunda execução ao mesmo tempo (código 13)
   - Mensagens: `Sincronizando com o site...`, `Sincronização concluída com sucesso.` e, se o programa não estiver na pasta, `ImperialSync.exe não foi encontrado na pasta do sistema.`
   - Ao terminar, a lista é recarregada sozinha. Um bloco **Detalhes da execução** mostra as últimas linhas do que o ImperialSync escreveu e o código de saída
+  - **Faixa verde só quando o estoque foi de fato sincronizado:** código `0` **e** nenhum produto enviado sem cadastro no site. "O site aceitou o envio" com todos os SKUs desconhecidos **não** é sucesso: a faixa fica **amarela** com `Sincronização concluída com alerta. 222 produtos foram enviados, mas nenhum SKU foi encontrado no catálogo do site.` (ou `22 dos 222 produtos enviados não têm cadastro no catálogo do site.`), e abaixo vêm **Recebidos pelo site**, **Atualizados**, **SKUs sem cadastro**, até 10 códigos de exemplo e a orientação de cadastrá-los no site com o SKU igual ao Código do Produto. Não é erro: internet, assinatura e banco funcionaram, e a lista de vendas é recarregada normalmente
+  - A cor sai de duas fontes, e basta uma apontar produto sem cadastro: o **código de saída** (`14`/`15`, do ImperialSync 1.2.0 em diante) e o **resumo do estoque** que o programa escreve (`Recebidos:`, `Atualizados:`, `SKUs desconhecidos:`, `Exemplos (...)`), lido por `ResumoEstoqueSiteLeitor`. Por isso um ImperialSync antigo (1.1.0), que ainda saía com `0`, também vira alerta. Falha de banco, de assinatura ou de internet continua **vermelha**, mesmo que o resumo exista
   - Prazo máximo de 10 minutos por execução; passado isso o processo é encerrado
 - **SKU do e-commerce = campo "Código do Produto"** do cadastro de produto (`TxtCodigoInterno` → `ProdutoDto.CodigoInterno` → `Produto.CodigoInterno` → coluna `produtos.codigo_interno`). O ImperialSync envia esse valor, sem alterar, como `sku` e o site o compara por igualdade exata com `ProductVariant.sku` (exemplo: Código do Produto `DIL001` → sku `DIL001`). Não renomeie essa propriedade nem a coluna sem avisar a integração; o teste `CodigoDoProdutoComoSkuTests` acusa.
 - **Este sistema não faz o trabalho do ImperialSync:** não chama a API do site, não assina nada, não conhece fila, reserva nem confirmação e não sincroniza estoque. O fluxo é `sistema → ImperialSync.exe → API do site → PostgreSQL → sistema recarrega a lista`
@@ -702,7 +704,9 @@ Se o IP do servidor mudar, atualiza-se **só o `hosts` do servidor** (ou a reser
 
   | Código | Significado | Faixa |
   | ------ | ----------- | ----- |
-  | `0` | Concluída | verde |
+  | `0` | Concluída, com todos os produtos enviados reconhecidos pelo site | verde |
+  | `14`, `15` | Alerta: estoque enviado, mas **nenhum** produto da loja existe no catálogo do site (`14`) ou **parte** não tem cadastro (`15`) | amarela |
+  | `0` com SKUs desconhecidos no resumo | ImperialSync antigo no mesmo cenário do `14`/`15` | amarela |
   | `10`, `8` | Concluída, mas há vendas que precisam de atenção / nenhum produto para enviar | amarela |
   | `3`, `13` | Outra sincronização já em andamento (neste computador / em outro) | amarela |
   | `9` | Interrompida | amarela |
