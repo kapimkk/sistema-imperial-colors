@@ -1,5 +1,6 @@
-using ImperialColors.Application.DTOs;
+﻿using ImperialColors.Application.DTOs;
 using ImperialColors.Application.Interfaces;
+using ImperialColors.Domain.Helpers;
 using ImperialColors.Domain.Interfaces;
 
 namespace ImperialColors.Application.Services;
@@ -119,6 +120,67 @@ public class RelatorioAnalyticsService : IRelatorioAnalyticsService
         return linhas
             .OrderByDescending(l => l.DataVenda)
             .ThenBy(l => l.NumeroVenda)
+            .ToList();
+    }
+
+    public async Task<IReadOnlyList<LinhaVendaPorCanalDto>> ObterVendasPorCanalAsync(
+        DateTime inicio, DateTime fim, CancellationToken cancellationToken = default)
+    {
+        var linhas = await _repository.ObterVendasPorCanalAsync(inicio, fim, cancellationToken);
+        return linhas.Select(l => new LinhaVendaPorCanalDto
+        {
+            DataVenda = l.DataVenda,
+            Canal = l.Canal,
+            CodigoProduto = l.CodigoProduto,
+            NomeProduto = l.NomeProduto,
+            NumeroVenda = l.NumeroVenda,
+            Quantidade = l.Quantidade,
+            ValorUnitario = l.ValorUnitario,
+            ValorTotal = l.ValorTotal,
+            ProdutoCadastrado = l.ProdutoCadastrado
+        }).ToList();
+    }
+
+    public async Task<IReadOnlyList<LinhaMovimentacaoProdutoDto>> ObterMovimentacoesProdutosAsync(
+        DateTime inicio, DateTime fim, CancellationToken cancellationToken = default)
+    {
+        var linhas = await _repository.ObterMovimentacoesProdutosAsync(inicio, fim, cancellationToken);
+        return linhas.Select(l => new LinhaMovimentacaoProdutoDto
+        {
+            Data = l.Data,
+            CodigoProduto = l.CodigoProduto,
+            NomeProduto = l.NomeProduto,
+            Unidade = l.Unidade,
+            Tipo = l.Tipo,
+            Quantidade = l.Quantidade,
+            SaldoAnterior = l.SaldoAnterior,
+            SaldoPosterior = l.SaldoPosterior,
+            Motivo = l.Motivo,
+            Usuario = l.Usuario,
+            NumeroVenda = l.NumeroVenda,
+            Canal = l.Canal
+        }).ToList();
+    }
+
+    public IReadOnlyList<TotalCanalDto> TotalizarPorCanal(IEnumerable<LinhaVendaPorCanalDto> linhas)
+    {
+        var porCanal = linhas
+            .GroupBy(l => l.Canal)
+            .ToDictionary(g => g.Key, g => new TotalCanalDto
+            {
+                Canal = g.Key,
+                QuantidadeLinhas = g.Count(),
+                QuantidadeItens = g.Sum(l => l.Quantidade),
+                ValorTotal = g.Sum(l => l.ValorTotal)
+            });
+
+        // Percorre a ordem fixa, e não o que apareceu no período: assim o rodapé tem sempre
+        // as mesmas linhas na mesma sequência, e um canal zerado aparece zerado em vez de
+        // sumir — o lojista precisa enxergar que o site não vendeu, não deduzir pela ausência.
+        return CanalVendaHelper.OrdemRelatorio
+            .Select(canal => porCanal.TryGetValue(canal, out var total)
+                ? total
+                : new TotalCanalDto { Canal = canal })
             .ToList();
     }
 }

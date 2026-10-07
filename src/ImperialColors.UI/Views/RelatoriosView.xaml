@@ -49,6 +49,10 @@
                                     Style="{StaticResource RelatorioNavItem}" Click="BtnNavRelatorio_Click">
                                 <TextBlock Style="{StaticResource RelatorioNavTitulo}" Text="Consolidado de Vendas (Geral)"/>
                             </Button>
+                            <Button x:Name="BtnNavVendasPorCanal" Tag="VendasPorCanal"
+                                    Style="{StaticResource RelatorioNavItem}" Click="BtnNavRelatorio_Click">
+                                <TextBlock Style="{StaticResource RelatorioNavTitulo}" Text="Vendas por Canal e Produto"/>
+                            </Button>
 
                             <TextBlock Style="{StaticResource RelatorioCategoriaHeader}" Text="ESTOQUE"/>
                             <Button x:Name="BtnNavEstoque" Tag="EstoqueCompleto"
@@ -66,6 +70,10 @@
                             <Button x:Name="BtnNavValidadeProxima" Tag="ValidadeProxima"
                                     Style="{StaticResource RelatorioNavItem}" Click="BtnNavRelatorio_Click">
                                 <TextBlock Style="{StaticResource RelatorioNavTitulo}" Text="Próximos da Validade"/>
+                            </Button>
+                            <Button x:Name="BtnNavMovimentacaoProdutos" Tag="MovimentacaoProdutos"
+                                    Style="{StaticResource RelatorioNavItem}" Click="BtnNavRelatorio_Click">
+                                <TextBlock Style="{StaticResource RelatorioNavTitulo}" Text="Movimentação de Produtos"/>
                             </Button>
 
                             <TextBlock Style="{StaticResource RelatorioCategoriaHeader}" Text="PREÇOS"/>

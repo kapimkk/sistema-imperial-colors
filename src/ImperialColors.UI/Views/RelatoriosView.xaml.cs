@@ -1,6 +1,7 @@
-using ImperialColors.Application.DTOs;
+﻿using ImperialColors.Application.DTOs;
 using ImperialColors.Application.Helpers;
 using ImperialColors.Application.Interfaces;
+using ImperialColors.Domain.Helpers;
 using ImperialColors.UI.Helpers;
 using ImperialColors.UI.Services;
 using Microsoft.Extensions.DependencyInjection;
@@ -32,6 +33,16 @@ public partial class RelatoriosView : UserControl
             "Relatório Consolidado de Vendas (Geral)",
             "Unifica vendas de balcão (PDV) e vendas externas em uma única listagem filtrada por período.",
             "Data, origem (Balcão ou Externa), código da venda, cliente/resumo, itens, subtotal, desconto, total e forma de pagamento.",
+            true, false),
+        ["VendasPorCanal"] = (
+            "Vendas por Canal e Produto",
+            "Cada produto vendido no período com o canal por onde a venda entrou — loja física (PDV), venda externa na rua e site. Traz os totais de cada canal no rodapé.",
+            "Data da venda, canal, código do produto, produto, número da venda, quantidade, valor unitário e valor total.",
+            true, false),
+        ["MovimentacaoProdutos"] = (
+            "Movimentação de Produtos (Entrada/Saída)",
+            "Extrato de entradas e saídas de estoque por produto e data: quando o item entrou e em que dias saiu, com o documento que originou cada movimentação.",
+            "Data, código do produto, produto, unidade, tipo (entrada/saída/ajuste), quantidade, saldo anterior, saldo posterior e origem.",
             true, false),
         ["EstoqueCompleto"] = (
             "Estoque Completo",
@@ -161,6 +172,79 @@ public partial class RelatoriosView : UserControl
     private static void NotificarSucesso(string caminho)
         => MessageBox.Show($"Arquivo gerado com sucesso:\n{caminho}", "Relatório", MessageBoxButton.OK, MessageBoxImage.Information);
 
+    /// <summary>
+    /// Notificação dos relatórios de controle, que além do arquivo escolhido pelo operador
+    /// guardam uma cópia no arquivo por data. A mensagem diz onde a cópia ficou — senão o
+    /// histórico existiria sem ninguém saber que existe.
+    ///
+    /// Quando o arquivamento falha (pasta sem permissão, disco cheio), o relatório pedido
+    /// já está salvo: a tela avisa que só a cópia não foi guardada, em vez de dar o
+    /// trabalho inteiro por perdido.
+    /// </summary>
+    private static void NotificarSucessoComArquivo(string caminho, string? caminhoArquivado)
+    {
+        if (caminhoArquivado is null)
+        {
+            MessageBox.Show(
+                $"Arquivo gerado com sucesso:\n{caminho}\n\n" +
+                "Obs.: não foi possível guardar a cópia na pasta de histórico " +
+                $"({RelatorioArquivoHelper.ObterDiretorioRaiz()}). Verifique a permissão da pasta.",
+                "Relatório", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        MessageBox.Show(
+            $"Arquivo gerado com sucesso:\n{caminho}\n\nCópia arquivada em:\n{caminhoArquivado}",
+            "Relatório", MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
+    /// <summary>
+    /// Vendas do período por produto, separadas pelo canal por onde entraram. Venda de
+    /// balcão é sempre loja física; venda externa carrega o canal escolhido no cadastro.
+    /// </summary>
+    private async Task GerarVendasPorCanalAsync()
+    {
+        var (inicio, fim) = ObterPeriodo();
+        var excel = ExportarExcel;
+        if (!TentarObterCaminhoSalvar($"VendasPorCanal_{inicio:yyyyMMdd}_{fim:yyyyMMdd}", excel, out var caminho))
+            return;
+
+        var analytics = _serviceProvider.GetRequiredService<IRelatorioAnalyticsService>();
+        var linhas = await analytics.ObterVendasPorCanalAsync(inicio, fim);
+        var totais = analytics.TotalizarPorCanal(linhas);
+        var relatorio = _serviceProvider.GetRequiredService<IRelatorioService>();
+
+        if (excel)
+            await relatorio.GerarRelatorioVendasPorCanalExcelAsync(linhas, totais, inicio, fim, caminho);
+        else
+            await relatorio.GerarRelatorioVendasPorCanalPdfAsync(linhas, totais, inicio, fim, caminho);
+
+        NotificarSucessoComArquivo(caminho, RelatorioArquivoHelper.ArquivarCopia(caminho, Relogio.Agora));
+    }
+
+    /// <summary>
+    /// Extrato de entradas e saídas do período, por produto e data — quando o item entrou e
+    /// em que dias saiu.
+    /// </summary>
+    private async Task GerarMovimentacaoProdutosAsync()
+    {
+        var (inicio, fim) = ObterPeriodo();
+        var excel = ExportarExcel;
+        if (!TentarObterCaminhoSalvar($"MovimentacaoProdutos_{inicio:yyyyMMdd}_{fim:yyyyMMdd}", excel, out var caminho))
+            return;
+
+        var linhas = await _serviceProvider.GetRequiredService<IRelatorioAnalyticsService>()
+            .ObterMovimentacoesProdutosAsync(inicio, fim);
+        var relatorio = _serviceProvider.GetRequiredService<IRelatorioService>();
+
+        if (excel)
+            await relatorio.GerarRelatorioMovimentacaoProdutosExcelAsync(linhas, inicio, fim, caminho);
+        else
+            await relatorio.GerarRelatorioMovimentacaoProdutosPdfAsync(linhas, inicio, fim, caminho);
+
+        NotificarSucessoComArquivo(caminho, RelatorioArquivoHelper.ArquivarCopia(caminho, Relogio.Agora));
+    }
+
     private static void NotificarErro(Exception ex)
         => MessageBox.Show($"Erro ao gerar relatório: {ex.Message}", "Erro", MessageBoxButton.OK, MessageBoxImage.Error);
 
@@ -174,6 +258,8 @@ public partial class RelatoriosView : UserControl
                 case "VendasPeriodo": await GerarVendasPeriodoAsync(); break;
                 case "VendasExternas": await GerarVendasExternasAsync(); break;
                 case "VendasConsolidadas": await GerarVendasConsolidadasAsync(); break;
+                case "VendasPorCanal": await GerarVendasPorCanalAsync(); break;
+                case "MovimentacaoProdutos": await GerarMovimentacaoProdutosAsync(); break;
                 case "EstoqueCompleto": await GerarEstoqueAsync(p => p.ObterTodosAsync()); break;
                 case "EstoqueBaixo": await GerarEstoqueAsync(p => p.ObterComEstoqueBaixoAsync()); break;
                 case "SemEstoque": await GerarEstoqueAsync(p => p.ObterSemEstoqueAsync()); break;

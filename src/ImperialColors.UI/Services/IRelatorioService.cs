@@ -27,5 +27,17 @@ public interface IRelatorioService
     Task GerarRelatorioValidadePdfAsync(IEnumerable<ProdutoDto> produtos, int diasLimite, string caminhoArquivo);
     Task GerarRelatorioValidadeExcelAsync(IEnumerable<ProdutoDto> produtos, int diasLimite, string caminhoArquivo);
 
+    Task GerarRelatorioVendasPorCanalPdfAsync(
+        IEnumerable<LinhaVendaPorCanalDto> linhas, IEnumerable<TotalCanalDto> totais,
+        DateTime inicio, DateTime fim, string caminhoArquivo);
+    Task GerarRelatorioVendasPorCanalExcelAsync(
+        IEnumerable<LinhaVendaPorCanalDto> linhas, IEnumerable<TotalCanalDto> totais,
+        DateTime inicio, DateTime fim, string caminhoArquivo);
+
+    Task GerarRelatorioMovimentacaoProdutosPdfAsync(
+        IEnumerable<LinhaMovimentacaoProdutoDto> linhas, DateTime inicio, DateTime fim, string caminhoArquivo);
+    Task GerarRelatorioMovimentacaoProdutosExcelAsync(
+        IEnumerable<LinhaMovimentacaoProdutoDto> linhas, DateTime inicio, DateTime fim, string caminhoArquivo);
+
     Task GerarOrcamentoPdfAsync(OrcamentoDto orcamento, string caminhoArquivo);
 }

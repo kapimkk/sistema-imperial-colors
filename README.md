@@ -758,6 +758,20 @@ Se o IP do servidor mudar, atualiza-se **só o `hosts` do servidor** (ou a reser
 - Vendas por período (PDF e Excel)
 - **Relatório Consolidado de Vendas (Geral)** — unifica vendas de balcão (PDV) e vendas externas com coluna **Origem** (`Balcão` / `Externa`); exportação PDF e Excel
 - **Relatório de Vendas Externas** — auditoria item a item das vendas de rua (filtro por período)
+- **Vendas por Canal e Produto** — cada produto vendido no período com o canal por onde a venda entrou; exportação PDF e Excel
+  - Canais: **Loja física** (PDV), **Venda externa (Rua)** e **Site** (pedido trazido pelo ImperialSync)
+  - O canal é **deduzido, nunca digitado**: sai de onde a venda foi registrada, não de um campo que alguém preenche
+  - ⚠️ A venda do site é gravada na **mesma tabela** das vendas de balcão — quem as separa é o registro da integração (`integration.imperial_sync_operations`), e é esse cruzamento que impede o pedido do site de ser somado como balcão. Loja sem o ImperialSync instalado simplesmente não tem linhas de "Site"
+  - Colunas: data da venda, canal, código do produto, produto, número da venda, quantidade, valor unitário e valor total
+  - Item manual de venda externa (sem produto cadastrado) sai marcado como `(sem cadastro)` em vez de com a célula vazia
+  - **Totais por canal** no rodapé do PDF e em aba própria no Excel; canal sem venda no período aparece **zerado**, não sumido
+  - No Excel, data e valores vão como número (não texto) e a planilha abre com autofiltro — dá para filtrar por canal e somar direto
+- **Movimentação de Produtos (Entrada/Saída)** — extrato de estoque por produto e data: quando o item entrou e em que dias saiu; exportação PDF e Excel
+  - Colunas: data, código do produto, produto, unidade, tipo (Entrada/Saída/Ajuste), quantidade, saldo anterior, saldo posterior e origem
+  - **Origem** resolve a linha sozinha: o número da venda e o canal quando a saída veio de uma venda (`20260918-0001 — Site`), senão o motivo (`Estoque inicial`, `Inventário`)
+  - O Excel tem a coluna **Qtd com Sinal** (saída negativa): somada, dá o saldo movimentado no período sem separar entradas de saídas à mão
+  - Ordenado por código do produto e depois por data — a história de cada item se lê em sequência
+- **Cópia arquivada automática** (só nestes dois relatórios de controle) — além do arquivo que você escolhe onde salvar, o sistema guarda uma cópia em `C:\relatorios_sistema\{mes-ano}\{dd-MM-yyyy}\` (`RELATORIOS_PATH` no `.env`), mesma estrutura do backup. Gerar o mesmo relatório duas vezes no mesmo dia substitui a cópia. Se o arquivamento falhar (pasta sem permissão, disco cheio), o relatório pedido **continua salvo** e a tela avisa que só a cópia não foi guardada
 - **Análise de Giro e Desempenho de Produtos** — três visões com exportação PDF/Excel:
   - **Mais Vendidos** — ranking por volume (balcão + vendas externas)
   - **Menos Vendidos** — itens com saída no período, ordenados do menor para o maior

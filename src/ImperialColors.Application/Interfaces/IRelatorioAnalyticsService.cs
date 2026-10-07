@@ -15,4 +15,16 @@ public interface IRelatorioAnalyticsService
 
     Task<IReadOnlyList<LinhaRelatorioVendaConsolidadaDto>> ObterVendasConsolidadasAsync(
         DateTime inicio, DateTime fim, CancellationToken cancellationToken = default);
+
+    /// <summary>Vendas do período por produto e canal (loja física, rua, site).</summary>
+    Task<IReadOnlyList<LinhaVendaPorCanalDto>> ObterVendasPorCanalAsync(
+        DateTime inicio, DateTime fim, CancellationToken cancellationToken = default);
+
+    /// <summary>Entradas e saídas de estoque do período, por produto e data.</summary>
+    Task<IReadOnlyList<LinhaMovimentacaoProdutoDto>> ObterMovimentacoesProdutosAsync(
+        DateTime inicio, DateTime fim, CancellationToken cancellationToken = default);
+
+    /// <summary>Totais por canal, na ordem fixa do relatório. Canal sem venda no período
+    /// sai zerado em vez de sumir: "o site não vendeu nada" é informação.</summary>
+    IReadOnlyList<TotalCanalDto> TotalizarPorCanal(IEnumerable<LinhaVendaPorCanalDto> linhas);
 }

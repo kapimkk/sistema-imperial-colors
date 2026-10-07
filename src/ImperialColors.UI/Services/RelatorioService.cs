@@ -1,4 +1,4 @@
-using ClosedXML.Excel;
+﻿using ClosedXML.Excel;
 
 using ImperialColors.Application.Configuration;
 using ImperialColors.Application.DTOs;
@@ -1187,6 +1187,248 @@ public class RelatorioService : IRelatorioService
             1 => "Vence amanhã",
             _ => $"Vence em {dias} dias"
         };
+    }
+
+    // ---------- Vendas por Canal e Produto ----------
+
+    public Task GerarRelatorioVendasPorCanalPdfAsync(
+        IEnumerable<LinhaVendaPorCanalDto> linhas, IEnumerable<TotalCanalDto> totais,
+        DateTime inicio, DateTime fim, string caminhoArquivo)
+    {
+        return Task.Run(() =>
+        {
+            using var writer = new PdfWriter(caminhoArquivo);
+            using var pdf = new PdfDocument(writer);
+            // Paisagem: sao oito colunas, e em retrato o nome do produto fica espremido a
+            // ponto de o relatorio nao servir para conferencia.
+            using var document = new Document(pdf, iText.Kernel.Geom.PageSize.A4.Rotate());
+            document.SetMargins(30, 30, 30, 30);
+
+            AdicionarCabecalhoRelatorio(document, "Vendas por Canal e Produto",
+                $"Periodo: {inicio:dd/MM/yyyy} a {fim:dd/MM/yyyy}");
+
+            var tabela = new ITextTable(new float[] { 1.6f, 1.6f, 1.3f, 3.2f, 1.6f, 0.9f, 1.2f, 1.3f })
+                .UseAllAvailableWidth();
+            AdicionarCabecalhoTabela(tabela, "Data Venda", "Canal", "Cod. Produto", "Produto",
+                "Nr. Venda", "Qtd", "Vlr Unit.", "Vlr Total");
+
+            var cultura = new System.Globalization.CultureInfo("pt-BR");
+            var lista = linhas.ToList();
+            foreach (var linha in lista)
+            {
+                tabela.AddCell(CelulaTabela(linha.DataVenda.ToString("dd/MM/yyyy HH:mm")));
+                tabela.AddCell(CelulaTabela(linha.CanalDescricao));
+                tabela.AddCell(CelulaTabela(linha.CodigoExibicao));
+                tabela.AddCell(CelulaTabela(linha.NomeProduto));
+                tabela.AddCell(CelulaTabela(linha.NumeroVenda));
+                tabela.AddCell(CelulaTabela(linha.Quantidade.ToString("G", cultura), TextAlignment.RIGHT));
+                tabela.AddCell(CelulaTabela(linha.ValorUnitario.ToString("C2", cultura), TextAlignment.RIGHT));
+                tabela.AddCell(CelulaTabela(linha.ValorTotal.ToString("C2", cultura), TextAlignment.RIGHT));
+            }
+
+            document.Add(tabela);
+            AdicionarLinhaSeparadora(document);
+
+            document.Add(new ITextParagraph("Totais por canal").SetFont(ObterFonte(true)).SetFontSize(12)
+                .SetMarginTop(10));
+
+            var tabelaTotais = new ITextTable(new float[] { 3f, 1.2f, 1.2f, 1.6f }).UseAllAvailableWidth();
+            AdicionarCabecalhoTabela(tabelaTotais, "Canal", "Linhas", "Itens", "Faturado");
+            foreach (var total in totais)
+            {
+                tabelaTotais.AddCell(CelulaTabela(total.CanalDescricao));
+                tabelaTotais.AddCell(CelulaTabela(total.QuantidadeLinhas.ToString(cultura), TextAlignment.RIGHT));
+                tabelaTotais.AddCell(CelulaTabela(total.QuantidadeItens.ToString("G", cultura), TextAlignment.RIGHT));
+                tabelaTotais.AddCell(CelulaTabela(total.ValorTotal.ToString("C2", cultura), TextAlignment.RIGHT));
+            }
+            document.Add(tabelaTotais);
+
+            var geral = lista.Sum(l => l.ValorTotal);
+            document.Add(new ITextParagraph($"\nTotal do Periodo: {geral.ToString("C2", cultura)} | {lista.Count} linha(s)")
+                .SetFont(ObterFonte(true)).SetFontSize(13).SetTextAlignment(TextAlignment.RIGHT));
+        });
+    }
+
+    public Task GerarRelatorioVendasPorCanalExcelAsync(
+        IEnumerable<LinhaVendaPorCanalDto> linhas, IEnumerable<TotalCanalDto> totais,
+        DateTime inicio, DateTime fim, string caminhoArquivo)
+    {
+        return Task.Run(() =>
+        {
+            using var workbook = new XLWorkbook();
+            var ws = workbook.AddWorksheet("Vendas por Canal");
+
+            ws.Cell(1, 1).Value = $"{_config.EmpresaNome} - Vendas por Canal e Produto";
+            ws.Cell(1, 1).Style.Font.Bold = true;
+            ws.Cell(1, 1).Style.Font.FontSize = 14;
+            ws.Range(1, 1, 1, 8).Merge();
+
+            ws.Cell(2, 1).Value = $"Periodo: {inicio:dd/MM/yyyy} a {fim:dd/MM/yyyy}";
+            ws.Range(2, 1, 2, 8).Merge();
+
+            var headers = new[] { "Data Venda", "Canal", "Cod. Produto", "Produto", "Nr. Venda",
+                                  "Quantidade", "Valor Unitario", "Valor Total" };
+            for (var i = 0; i < headers.Length; i++)
+            {
+                var cell = ws.Cell(4, i + 1);
+                cell.Value = headers[i];
+                cell.Style.Fill.BackgroundColor = XLColor.FromArgb(245, 194, 0);
+                cell.Style.Font.Bold = true;
+            }
+
+            var row = 5;
+            foreach (var linha in linhas)
+            {
+                // Data e valores vao como numero, nao como texto: e o que permite ao lojista
+                // filtrar por canal e somar no proprio Excel, que e o uso real deste arquivo.
+                ws.Cell(row, 1).Value = linha.DataVenda;
+                ws.Cell(row, 1).Style.NumberFormat.Format = "dd/mm/yyyy hh:mm";
+                ws.Cell(row, 2).Value = linha.CanalDescricao;
+                ws.Cell(row, 3).Value = linha.CodigoExibicao;
+                ws.Cell(row, 4).Value = linha.NomeProduto;
+                ws.Cell(row, 5).Value = linha.NumeroVenda;
+                ws.Cell(row, 6).Value = linha.Quantidade;
+                ws.Cell(row, 7).Value = linha.ValorUnitario;
+                ws.Cell(row, 7).Style.NumberFormat.Format = "R$ #,##0.00";
+                ws.Cell(row, 8).Value = linha.ValorTotal;
+                ws.Cell(row, 8).Style.NumberFormat.Format = "R$ #,##0.00";
+                if (row % 2 == 0)
+                    ws.Row(row).Style.Fill.BackgroundColor = XLColor.FromArgb(248, 249, 250);
+                row++;
+            }
+
+            if (row > 5)
+                ws.Range(4, 1, row - 1, headers.Length).SetAutoFilter();
+
+            ws.Columns().AdjustToContents();
+
+            var wsTotais = workbook.AddWorksheet("Totais por Canal");
+            var headersTotais = new[] { "Canal", "Linhas", "Itens", "Faturado" };
+            for (var i = 0; i < headersTotais.Length; i++)
+            {
+                var cell = wsTotais.Cell(1, i + 1);
+                cell.Value = headersTotais[i];
+                cell.Style.Fill.BackgroundColor = XLColor.FromArgb(245, 194, 0);
+                cell.Style.Font.Bold = true;
+            }
+
+            var linhaTotal = 2;
+            foreach (var total in totais)
+            {
+                wsTotais.Cell(linhaTotal, 1).Value = total.CanalDescricao;
+                wsTotais.Cell(linhaTotal, 2).Value = total.QuantidadeLinhas;
+                wsTotais.Cell(linhaTotal, 3).Value = total.QuantidadeItens;
+                wsTotais.Cell(linhaTotal, 4).Value = total.ValorTotal;
+                wsTotais.Cell(linhaTotal, 4).Style.NumberFormat.Format = "R$ #,##0.00";
+                linhaTotal++;
+            }
+            wsTotais.Columns().AdjustToContents();
+
+            workbook.SaveAs(caminhoArquivo);
+        });
+    }
+
+    // ---------- Movimentacao de Produtos ----------
+
+    public Task GerarRelatorioMovimentacaoProdutosPdfAsync(
+        IEnumerable<LinhaMovimentacaoProdutoDto> linhas, DateTime inicio, DateTime fim, string caminhoArquivo)
+    {
+        return Task.Run(() =>
+        {
+            using var writer = new PdfWriter(caminhoArquivo);
+            using var pdf = new PdfDocument(writer);
+            using var document = new Document(pdf, iText.Kernel.Geom.PageSize.A4.Rotate());
+            document.SetMargins(30, 30, 30, 30);
+
+            AdicionarCabecalhoRelatorio(document, "Movimentacao de Produtos (Entrada/Saida)",
+                $"Periodo: {inicio:dd/MM/yyyy} a {fim:dd/MM/yyyy}");
+
+            var tabela = new ITextTable(new float[] { 1.5f, 1.2f, 2.8f, 1f, 0.9f, 1f, 1f, 2.6f })
+                .UseAllAvailableWidth();
+            AdicionarCabecalhoTabela(tabela, "Data", "Cod. Produto", "Produto", "Tipo",
+                "Qtd", "Saldo Ant.", "Saldo Pos.", "Origem");
+
+            var cultura = new System.Globalization.CultureInfo("pt-BR");
+            var lista = linhas.ToList();
+            foreach (var linha in lista)
+            {
+                tabela.AddCell(CelulaTabela(linha.Data.ToString("dd/MM/yyyy HH:mm")));
+                tabela.AddCell(CelulaTabela(linha.CodigoProduto));
+                tabela.AddCell(CelulaTabela(linha.NomeProduto));
+                tabela.AddCell(CelulaTabela(linha.TipoDescricao));
+                tabela.AddCell(CelulaTabela(linha.Quantidade.ToString("G", cultura), TextAlignment.RIGHT));
+                tabela.AddCell(CelulaTabela(linha.SaldoAnterior.ToString("G", cultura), TextAlignment.RIGHT));
+                tabela.AddCell(CelulaTabela(linha.SaldoPosterior.ToString("G", cultura), TextAlignment.RIGHT));
+                tabela.AddCell(CelulaTabela(linha.OrigemDescricao));
+            }
+
+            document.Add(tabela);
+            AdicionarLinhaSeparadora(document);
+
+            var entradas = lista.Where(l => l.Tipo == TipoMovimentacao.Entrada).Sum(l => l.Quantidade);
+            var saidas = lista.Where(l => l.Tipo == TipoMovimentacao.Saida).Sum(l => l.Quantidade);
+            var ajustes = lista.Count(l => l.Tipo == TipoMovimentacao.Ajuste);
+
+            document.Add(new ITextParagraph(
+                    $"\nEntradas: {entradas.ToString("G", cultura)} | Saidas: {saidas.ToString("G", cultura)} | " +
+                    $"Ajustes: {ajustes} | {lista.Count} movimentacao(oes)")
+                .SetFont(ObterFonte(true)).SetFontSize(12).SetTextAlignment(TextAlignment.RIGHT));
+        });
+    }
+
+    public Task GerarRelatorioMovimentacaoProdutosExcelAsync(
+        IEnumerable<LinhaMovimentacaoProdutoDto> linhas, DateTime inicio, DateTime fim, string caminhoArquivo)
+    {
+        return Task.Run(() =>
+        {
+            using var workbook = new XLWorkbook();
+            var ws = workbook.AddWorksheet("Movimentacoes");
+
+            ws.Cell(1, 1).Value = $"{_config.EmpresaNome} - Movimentacao de Produtos";
+            ws.Cell(1, 1).Style.Font.Bold = true;
+            ws.Cell(1, 1).Style.Font.FontSize = 14;
+            ws.Range(1, 1, 1, 10).Merge();
+
+            ws.Cell(2, 1).Value = $"Periodo: {inicio:dd/MM/yyyy} a {fim:dd/MM/yyyy}";
+            ws.Range(2, 1, 2, 10).Merge();
+
+            var headers = new[] { "Data", "Cod. Produto", "Produto", "Unidade", "Tipo",
+                                  "Quantidade", "Qtd com Sinal", "Saldo Anterior", "Saldo Posterior", "Origem" };
+            for (var i = 0; i < headers.Length; i++)
+            {
+                var cell = ws.Cell(4, i + 1);
+                cell.Value = headers[i];
+                cell.Style.Fill.BackgroundColor = XLColor.FromArgb(245, 194, 0);
+                cell.Style.Font.Bold = true;
+            }
+
+            var row = 5;
+            foreach (var linha in linhas)
+            {
+                ws.Cell(row, 1).Value = linha.Data;
+                ws.Cell(row, 1).Style.NumberFormat.Format = "dd/mm/yyyy hh:mm";
+                ws.Cell(row, 2).Value = linha.CodigoProduto;
+                ws.Cell(row, 3).Value = linha.NomeProduto;
+                ws.Cell(row, 4).Value = linha.Unidade;
+                ws.Cell(row, 5).Value = linha.TipoDescricao;
+                ws.Cell(row, 6).Value = linha.Quantidade;
+                // Coluna com sinal: somada, da o saldo movimentado no periodo sem o lojista
+                // precisar separar entradas de saidas a mao.
+                ws.Cell(row, 7).Value = linha.QuantidadeComSinal;
+                ws.Cell(row, 8).Value = linha.SaldoAnterior;
+                ws.Cell(row, 9).Value = linha.SaldoPosterior;
+                ws.Cell(row, 10).Value = linha.OrigemDescricao;
+                if (row % 2 == 0)
+                    ws.Row(row).Style.Fill.BackgroundColor = XLColor.FromArgb(248, 249, 250);
+                row++;
+            }
+
+            if (row > 5)
+                ws.Range(4, 1, row - 1, headers.Length).SetAutoFilter();
+
+            ws.Columns().AdjustToContents();
+            workbook.SaveAs(caminhoArquivo);
+        });
     }
 
     private void AdicionarCabecalhoRelatorio(Document document, string titulo, string subtitulo)

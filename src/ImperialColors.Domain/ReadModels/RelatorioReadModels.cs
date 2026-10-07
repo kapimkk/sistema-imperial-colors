@@ -1,3 +1,5 @@
+﻿using ImperialColors.Domain.Enums;
+
 namespace ImperialColors.Domain.ReadModels;
 
 public class LinhaRelatorioVendaExternaResumo
@@ -58,4 +60,64 @@ public class ResumoComissoesVendaExterna
     public decimal TotalPago { get; set; }
     public int QuantidadePaga { get; set; }
     public decimal TotalDoMes { get; set; }
+}
+
+/// <summary>
+/// Uma linha de produto vendido, com o canal por onde a venda entrou. Granularidade de
+/// ITEM, não de venda: a pergunta que o relatório responde é "o que cada produto rendeu em
+/// cada canal", e isso não dá para extrair de um total por venda.
+/// </summary>
+public class LinhaVendaPorCanalResumo
+{
+    public DateTime DataVenda { get; set; }
+    public CanalVenda Canal { get; set; }
+
+    /// <summary>Id da venda de balcão, usado para cruzar com o registro da integração e
+    /// descobrir quais vieram do site. Zero nas linhas de venda externa.</summary>
+    public int VendaId { get; set; }
+
+    /// <summary>Código interno do produto. Vazio no item manual da venda externa, que não
+    /// tem produto cadastrado por trás — ver <see cref="ProdutoCadastrado"/>.</summary>
+    public string CodigoProduto { get; set; } = string.Empty;
+    public string NomeProduto { get; set; } = string.Empty;
+    public string NumeroVenda { get; set; } = string.Empty;
+    public decimal Quantidade { get; set; }
+    public decimal ValorUnitario { get; set; }
+    public decimal ValorTotal { get; set; }
+
+    /// <summary>Falso no item digitado à mão na venda externa. O relatório marca essas
+    /// linhas porque elas entram no faturamento mas não têm histórico de estoque.</summary>
+    public bool ProdutoCadastrado { get; set; }
+}
+
+/// <summary>
+/// Uma movimentação de estoque já resolvida com o código do produto e com o documento que
+/// a originou — é a linha do extrato que mostra quando o produto entrou e quando saiu.
+/// </summary>
+public class LinhaMovimentacaoProdutoResumo
+{
+    public DateTime Data { get; set; }
+
+    /// <summary>Venda de balcão que originou a saída, quando houve. Usada para cruzar com o
+    /// registro da integração e descobrir se a venda veio do site.</summary>
+    public int? VendaId { get; set; }
+
+    public string CodigoProduto { get; set; } = string.Empty;
+    public string NomeProduto { get; set; } = string.Empty;
+    public string Unidade { get; set; } = string.Empty;
+    public TipoMovimentacao Tipo { get; set; }
+    public decimal Quantidade { get; set; }
+    public decimal SaldoAnterior { get; set; }
+    public decimal SaldoPosterior { get; set; }
+    public string Motivo { get; set; } = string.Empty;
+    public string? Usuario { get; set; }
+
+    /// <summary>Número da venda que gerou a saída, quando veio de uma. Nulo em entrada de
+    /// compra, estoque inicial e ajuste — que são justamente os casos em que o
+    /// <see cref="Motivo"/> é a única explicação disponível.</summary>
+    public string? NumeroVenda { get; set; }
+
+    /// <summary>Canal da venda que gerou a saída. Nulo quando a movimentação não veio de
+    /// venda.</summary>
+    public CanalVenda? Canal { get; set; }
 }
