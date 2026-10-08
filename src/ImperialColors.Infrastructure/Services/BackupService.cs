@@ -108,6 +108,11 @@ public class BackupService : IBackupService
             ?? throw new InvalidOperationException(
                 $"Utilitário pg_restore não encontrado junto do pg_dump ({pgDump}). Reinstale o PostgreSQL ou ajuste PG_DUMP_PATH.");
 
+        // Mesmo lock das edições de imagem em todos os PCs: dump e arquivos pertencem
+        // ao mesmo estado, sem remoção/substituição entre o snapshot e a cópia.
+        using var bloqueioImagens = await new ImagemProdutoStorage(options.RaizImagensProdutos)
+            .AdquirirBloqueioAsync(cancellationToken);
+
         // Uma leitura do banco, dois arquivos — ver o sumário de PgDumpExecutor.
         await PgDumpExecutor.ExportarAsync(
             pgDump,
@@ -122,6 +127,7 @@ public class BackupService : IBackupService
         await PgDumpExecutor.ConverterParaSqlAsync(pgRestore, caminhoDump, caminhoSql, cancellationToken);
 
         CopiarArquivosLocais(options, pastaDestino);
+        await BackupImagensProdutos.CopiarAsync(options.RaizImagensProdutos, pastaDestino, cancellationToken);
     }
 
     private void CopiarArquivosLocais(BackupOptions options, string pastaDestino)
@@ -139,22 +145,38 @@ public class BackupService : IBackupService
             throw new DirectoryNotFoundException($"Pasta de logos não encontrada: {options.PastaLogos}");
 
         var destinoLogos = Path.Combine(pastaDestino, "logos_empresa");
-        CopiarDiretorio(options.PastaLogos, destinoLogos);
+        // Sem icons/, ResolverPastaLogos usa a raiz da instalação. Nesse fallback não
+        // percorremos subpastas de executáveis, logs, caches ou do próprio backup.
+        var logosNaRaiz = string.Equals(Path.GetFullPath(options.PastaLogos).TrimEnd(Path.DirectorySeparatorChar),
+            Path.GetFullPath(Path.GetDirectoryName(options.CaminhoAppsettings)!).TrimEnd(Path.DirectorySeparatorChar), StringComparison.OrdinalIgnoreCase);
+        CopiarDiretorio(options.PastaLogos, destinoLogos, recursivo: !logosNaRaiz);
     }
 
-    private static void CopiarDiretorio(string origem, string destino)
+    private static readonly HashSet<string> ExtensoesLogo = new(StringComparer.OrdinalIgnoreCase)
+        { ".png", ".jpg", ".jpeg", ".ico", ".bmp", ".gif", ".webp" };
+
+    private static void CopiarDiretorio(string origem, string destino, bool recursivo = true)
     {
         Directory.CreateDirectory(destino);
 
         foreach (var arquivo in Directory.GetFiles(origem))
         {
             var nome = Path.GetFileName(arquivo);
+            // Somente assets de imagem: nunca .env, executáveis, logs ou configurações.
+            if (!ExtensoesLogo.Contains(Path.GetExtension(nome))) continue;
+            if ((File.GetAttributes(arquivo) & FileAttributes.ReparsePoint) != 0)
+                throw new InvalidOperationException("Um logo usa link externo; revise os assets antes do backup.");
             File.Copy(arquivo, Path.Combine(destino, nome), overwrite: true);
         }
 
+        if (!recursivo) return;
         foreach (var subpasta in Directory.GetDirectories(origem))
         {
             var nome = Path.GetFileName(subpasta);
+            // Catálogo tem pacote/manifesto próprios, não entra novamente em logos_empresa.
+            if (nome.Equals(ImagemProdutoStorage.Pasta, StringComparison.OrdinalIgnoreCase)) continue;
+            if ((File.GetAttributes(subpasta) & FileAttributes.ReparsePoint) != 0)
+                throw new InvalidOperationException("A pasta de logos usa link externo; revise os assets antes do backup.");
             CopiarDiretorio(subpasta, Path.Combine(destino, nome));
         }
     }

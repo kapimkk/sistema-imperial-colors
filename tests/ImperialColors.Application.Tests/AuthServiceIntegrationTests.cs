@@ -1,53 +1,53 @@
 using ImperialColors.Application.DTOs;
 using ImperialColors.Application.Extensions;
 using ImperialColors.Application.Interfaces;
+using ImperialColors.Application.Security;
+using ImperialColors.Domain.Entities;
+using ImperialColors.Domain.Enums;
+using ImperialColors.Infrastructure.Data;
 using ImperialColors.Infrastructure.Extensions;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Xunit;
 
 namespace ImperialColors.Application.Tests;
 
+/// <summary>Nunca lê .env ou credenciais reais; usa usuário fictício no banco local explicitamente autorizado.</summary>
 public class AuthServiceIntegrationTests
 {
     [Fact]
-    public async Task LoginAsync_NoBancoReal_AdminPadraoFunciona()
+    public async Task LoginAsync_NoBancoLocalIsolado_CredenciaisFicticiasFuncionam()
     {
-        var envPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", ".env"));
-        if (!File.Exists(envPath))
-            return;
-
-        DotNetEnv.Env.Load(envPath);
-
-        var password = Environment.GetEnvironmentVariable("DB_PASSWORD");
-        if (string.IsNullOrWhiteSpace(password))
-            return;
-
-        var host = Environment.GetEnvironmentVariable("DB_HOST") ?? "localhost";
-        var port = Environment.GetEnvironmentVariable("DB_PORT") ?? "5432";
-        var db = Environment.GetEnvironmentVariable("DB_NAME") ?? "imperial_colors";
-        var user = Environment.GetEnvironmentVariable("DB_USER") ?? "postgres";
-        var ssl = Environment.GetEnvironmentVariable("DB_SSL_MODE") ?? "Prefer";
-        var adminUser = Environment.GetEnvironmentVariable("ADMIN_USERNAME") ?? "admin";
-        var adminPass = Environment.GetEnvironmentVariable("ADMIN_PASSWORD") ?? "Admin@1234";
-
-        var cs = $"Host={host};Port={port};Database={db};Username={user};Password={password};SSL Mode={ssl};Trust Server Certificate=true;";
-
+        if (!IntegrationTestGuard.TryObterConnectionString(out var cs)) return;
         var services = new ServiceCollection();
         services.AddLogging(b => b.SetMinimumLevel(LogLevel.Warning));
         services.AddInfrastructure(cs);
         services.AddApplication();
-
         await using var provider = services.BuildServiceProvider();
-        await using var scope = provider.CreateAsyncScope();
-        var auth = scope.ServiceProvider.GetRequiredService<IAuthService>();
-
-        var sessao = await auth.LoginAsync(new LoginDto
+        var factory = provider.GetRequiredService<IDbContextFactory<AppDbContext>>();
+        await using var context = await factory.CreateDbContextAsync();
+        const string password = "Imperial-Local-Test-2026!";
+        var (hash,salt) = PasswordHasher.HashPassword(password);
+        var usuario = new Usuario
         {
-            Username = adminUser,
-            Senha = adminPass
-        });
-
-        Assert.Equal(adminUser.ToLowerInvariant(), sessao.Username);
+            Username = "local_test_" + Guid.NewGuid().ToString("N"),
+            NomeCompleto = "Usuário fictício local", Email = $"local-{Guid.NewGuid():N}@example.test",
+            SenhaHash = hash, Salt = salt, Status = StatusUsuario.Aprovado, Permissao = PermissaoUsuario.Admin
+        };
+        context.Usuarios.Add(usuario);
+        await context.SaveChangesAsync();
+        try
+        {
+            var auth = provider.GetRequiredService<IAuthService>();
+            var sessao = await auth.LoginAsync(new LoginDto {Username=usuario.Username,Senha=password});
+            Assert.Equal(usuario.Id,sessao.Id);
+            Assert.Equal(usuario.Username,sessao.Username);
+        }
+        finally
+        {
+            context.Usuarios.Remove(usuario);
+            await context.SaveChangesAsync();
+        }
     }
 }

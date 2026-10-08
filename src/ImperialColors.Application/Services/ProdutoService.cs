@@ -28,6 +28,7 @@ public class ProdutoService : IProdutoService
     private readonly IAuditoriaService _auditoria;
     private readonly IUsuarioAtual _usuarioAtual;
     private readonly ILogger<ProdutoService> _logger;
+    private readonly IImagemProdutoStorage? _imagens;
 
     public ProdutoService(
         IProdutoRepository produtoRepository,
@@ -37,7 +38,8 @@ public class ProdutoService : IProdutoService
         IConfiguracaoFiscalService configuracaoFiscal,
         IAuditoriaService auditoria,
         IUsuarioAtual usuarioAtual,
-        ILogger<ProdutoService> logger)
+        ILogger<ProdutoService> logger,
+        IImagemProdutoStorage? imagens = null)
     {
         _produtoRepository = produtoRepository;
         _categoriaRepository = categoriaRepository;
@@ -47,6 +49,7 @@ public class ProdutoService : IProdutoService
         _auditoria = auditoria;
         _usuarioAtual = usuarioAtual;
         _logger = logger;
+        _imagens = imagens;
     }
 
     public async Task<IEnumerable<ProdutoDto>> ObterTodosAsync()
@@ -112,7 +115,7 @@ public class ProdutoService : IProdutoService
 
     public async Task<ProdutoDto> CriarAsync(CriarProdutoDto dto)
     {
-        ProdutoValidator.Validar(dto);
+        ProdutoValidator.ValidarNovo(dto);
         await ValidarReferenciasCatalogoAsync(dto.CategoriaId!.Value, dto.MarcaId!.Value);
         await ValidarCodigoBarrasUnicoAsync(dto.CodigoBarras);
 
@@ -140,13 +143,16 @@ public class ProdutoService : IProdutoService
             Unidade = unidade,
             TamanhoEmbalagem = InputSanitizer.SanitizarTexto(dto.TamanhoEmbalagem, 30),
             PesoGramas = dto.PesoGramas,
+            AlturaCm = dto.AlturaCm,
+            LarguraCm = dto.LarguraCm,
+            ComprimentoCm = dto.ComprimentoCm,
             Custo = dto.Custo,
             PrecoVenda = dto.PrecoVenda,
             PromocaoAtiva = dto.PromocaoAtiva,
             PrecoPromocional = dto.PromocaoAtiva ? dto.PrecoPromocional : null,
             DataValidade = dto.DataValidade?.Date,
             FornecedorId = dto.FornecedorId,
-            Observacoes = InputSanitizer.SanitizarTexto(dto.Observacoes, 500)
+            Observacoes = InputSanitizer.SanitizarTexto(dto.Observacoes, 10_000)
         };
 
         // Pela navegação, a movimentação entra no mesmo SaveChanges do produto: ou os dois gravam, ou nenhum.
@@ -162,10 +168,23 @@ public class ProdutoService : IProdutoService
             });
         }
 
-        var criado = await _produtoRepository.InserirProdutoAsync(
-            produto,
-            permitirRegenerarCodigoInterno: !codigoManual,
-            obterProximoCodigoInternoAsync: () => RegenerarCodigoInternoAsync(produto.Nome, produto.CodigoInterno));
+        using var bloqueioImagem = (dto.AlterarImagem || dto.RemoverImagem) && _imagens is not null
+            ? await _imagens.AdquirirBloqueioAsync() : null;
+        produto.ImagemProdutoPath = await PrepararImagemAsync(dto, null);
+        produto.ImagemRemovida = dto.RemoverImagem;
+        Produto criado;
+        try
+        {
+            criado = await _produtoRepository.InserirProdutoAsync(
+                produto,
+                permitirRegenerarCodigoInterno: !codigoManual,
+                obterProximoCodigoInternoAsync: () => RegenerarCodigoInternoAsync(produto.Nome, produto.CodigoInterno));
+        }
+        catch
+        {
+            if (dto.AlterarImagem) RemoverImagemSemInterromper(produto.ImagemProdutoPath);
+            throw;
+        }
 
         _logger.LogInformation("Produto criado: {Nome} ({CodigoInterno})", dto.Nome, criado.CodigoInterno);
         return MapParaDto(criado);
@@ -177,6 +196,8 @@ public class ProdutoService : IProdutoService
         await ValidarReferenciasCatalogoAsync(dto.CategoriaId!.Value, dto.MarcaId!.Value);
         await ValidarCodigoBarrasUnicoAsync(dto.CodigoBarras, id);
 
+        using var bloqueioImagem = (dto.AlterarImagem || dto.RemoverImagem) && _imagens is not null
+            ? await _imagens.AdquirirBloqueioAsync() : null;
         var produto = await _produtoRepository.ObterPorIdAsync(id)
             ?? throw new DomainException($"Produto com Id {id} não encontrado.");
 
@@ -201,21 +222,41 @@ public class ProdutoService : IProdutoService
         produto.Unidade = unidadeAtualizada;
         produto.TamanhoEmbalagem = InputSanitizer.SanitizarTexto(dto.TamanhoEmbalagem, 30);
         produto.PesoGramas = dto.PesoGramas;
+        produto.AlturaCm = dto.AlturaCm;
+        produto.LarguraCm = dto.LarguraCm;
+        produto.ComprimentoCm = dto.ComprimentoCm;
         produto.Custo = dto.Custo;
         produto.PrecoVenda = dto.PrecoVenda;
         produto.PromocaoAtiva = dto.PromocaoAtiva;
         produto.PrecoPromocional = dto.PromocaoAtiva ? dto.PrecoPromocional : null;
         produto.DataValidade = dto.DataValidade?.Date;
         produto.FornecedorId = dto.FornecedorId;
-        produto.Observacoes = InputSanitizer.SanitizarTexto(dto.Observacoes, 500);
+        produto.Observacoes = InputSanitizer.SanitizarTexto(dto.Observacoes, 10_000);
 
         // Campos comerciais + ajuste de estoque (se a quantidade foi alterada na tela)
         // são gravados em uma única transação, com o delta de estoque calculado contra
         // o valor real e atual do banco — não contra o valor que estava em memória quando
         // o formulário foi aberto. Isso evita que salvar a edição de um produto apague
         // silenciosamente uma baixa feita por uma venda concorrente no PDV.
-        var atualizado = await _produtoRepository.AtualizarComAjusteEstoqueTransacionalAsync(
-            produto, quantidadeBaseline, dto.QuantidadeEstoque, "Ajuste manual via edição de produto", "Administrador");
+        var imagemAnterior = produto.ImagemProdutoPath;
+        var novaImagem = await PrepararImagemAsync(dto, imagemAnterior);
+        produto.ImagemProdutoPath = novaImagem;
+        if (dto.RemoverImagem) produto.ImagemRemovida = true;
+        else if (dto.AlterarImagem) produto.ImagemRemovida = false;
+        Produto atualizado;
+        try
+        {
+            atualizado = await _produtoRepository.AtualizarComAjusteEstoqueTransacionalAsync(
+                produto, quantidadeBaseline, dto.QuantidadeEstoque, "Ajuste manual via edição de produto", "Administrador",
+                alterarImagem: dto.AlterarImagem || dto.RemoverImagem);
+        }
+        catch
+        {
+            if (dto.AlterarImagem) RemoverImagemSemInterromper(novaImagem);
+            throw;
+        }
+        if ((dto.AlterarImagem || dto.RemoverImagem) && imagemAnterior != novaImagem)
+            RemoverImagemSemInterromper(imagemAnterior);
 
         _logger.LogInformation("Produto atualizado: {Nome} ({Id})", dto.Nome, id);
 
@@ -247,6 +288,25 @@ public class ProdutoService : IProdutoService
         }
 
         return MapParaDto(atualizado);
+    }
+
+    private Task<string?> PrepararImagemAsync(CriarProdutoDto dto, string? anterior)
+    {
+        if (dto.RemoverImagem) return Task.FromResult<string?>(null);
+        if (!dto.AlterarImagem) return Task.FromResult(anterior);
+        if (_imagens is null || string.IsNullOrWhiteSpace(dto.ImagemArquivoSelecionado))
+            throw new DomainException("Selecione uma imagem válida antes de salvar.");
+        return ImportarImagemAsync(dto.ImagemArquivoSelecionado);
+    }
+
+    private async Task<string?> ImportarImagemAsync(string origem)
+        => await _imagens!.ImportarAsync(origem);
+
+    private void RemoverImagemSemInterromper(string? referencia)
+    {
+        if (_imagens is null || string.IsNullOrWhiteSpace(referencia)) return;
+        try { _imagens.RemoverSeExistir(referencia); }
+        catch { _logger.LogWarning("Não foi possível limpar um arquivo de imagem do catálogo. Verifique o backup local."); }
     }
 
     private static string DescreverPromocao(bool ativa, decimal? preco)
@@ -505,6 +565,11 @@ public class ProdutoService : IProdutoService
         Unidade = p.Unidade,
         TamanhoEmbalagem = p.TamanhoEmbalagem,
         PesoGramas = p.PesoGramas,
+        AlturaCm = p.AlturaCm,
+        LarguraCm = p.LarguraCm,
+        ComprimentoCm = p.ComprimentoCm,
+        ImagemProdutoPath = p.ImagemProdutoPath,
+        ImagemRemovida = p.ImagemRemovida,
         Custo = p.Custo,
         PrecoVenda = p.PrecoVenda,
         PromocaoAtiva = p.PromocaoAtiva,

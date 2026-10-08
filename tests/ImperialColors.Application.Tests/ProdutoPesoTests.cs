@@ -69,7 +69,7 @@ public class ProdutoPesoTests
     };
 
     /// <summary>O catálogo inteiro que já existe está sem peso — o campo não pode ser
-    /// obrigatório, nem para produto novo (pincel, serviço) em que peso não faz sentido.</summary>
+    /// obrigatório, na edição de um produto legado. Novo cadastro usa ValidarNovo e exige dados de frete.</summary>
     [Fact]
     public void Validar_SemPeso_EhAceito()
         => ProdutoValidator.Validar(ProdutoValido(null));
@@ -90,17 +90,9 @@ public class ProdutoPesoTests
         Assert.Contains("maior que zero", erro.Message);
     }
 
-    /// <summary>Preço ou código de barras digitado no campo de peso passaria despercebido
-    /// até alguém ver uma nota fiscal com sete toneladas de tinta.</summary>
     [Fact]
-    public void Validar_PesoAcimaDoLimite_RecusaLembrandoDaUnidade()
-    {
-        var erro = Assert.Throws<DomainException>(
-            () => ProdutoValidator.Validar(ProdutoValido(PesoProdutoHelper.PesoMaximoGramas + 1)));
-
-        Assert.Contains("gramas", erro.Message);
-    }
-
+    public void Validar_NaoInventaLimiteDeTransportadora()
+        => ProdutoValidator.Validar(ProdutoValido(1_000_001));
     [Fact]
     public void Validar_PesoExatamenteNoLimite_EhAceito()
         => ProdutoValidator.Validar(ProdutoValido(PesoProdutoHelper.PesoMaximoGramas));

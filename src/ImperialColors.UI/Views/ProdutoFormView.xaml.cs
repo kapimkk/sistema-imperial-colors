@@ -7,6 +7,9 @@ using ImperialColors.Domain.Enums;
 using ImperialColors.Domain.Exceptions;
 using ImperialColors.UI.Helpers;
 using System.Globalization;
+using System.IO;
+using System.Windows.Media.Imaging;
+using ImperialColors.Infrastructure.Services;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
@@ -21,6 +24,11 @@ public partial class ProdutoFormView : Window
     private readonly IFornecedorService _fornecedorService;
     private readonly IConfiguracaoFiscalService _configuracaoFiscal;
     private readonly INcmService _ncmService;
+    private readonly IImagemProdutoStorage _imagens;
+    private readonly IProdutoFormDialogs _dialogs;
+    private string? _imagemReferencia;
+    private string? _imagemSelecionada;
+    private bool _removerImagem;
     private int? _produtoId;
     private decimal? _quantidadeEstoqueCarregadaNaEdicao;
     private bool _codigoDefinidoManualmente;
@@ -41,16 +49,20 @@ public partial class ProdutoFormView : Window
         IMarcaService marcaService,
         IFornecedorService fornecedorService,
         IConfiguracaoFiscalService configuracaoFiscal,
-        INcmService ncmService)
+        INcmService ncmService,
+        IImagemProdutoStorage? imagens = null, IProdutoFormDialogs? dialogs = null)
     {
         InitializeComponent();
         ModalWindowHelper.AplicarEstiloModerno(this);
+        MaxHeight = SystemParameters.WorkArea.Height;
         _produtoService = produtoService;
         _categoriaService = categoriaService;
         _marcaService = marcaService;
         _fornecedorService = fornecedorService;
         _configuracaoFiscal = configuracaoFiscal;
         _ncmService = ncmService;
+        _imagens = imagens ?? new ImagemProdutoStorage();
+        _dialogs = dialogs ?? new ProdutoFormDialogs();
 
         SelecionarUnidadePadrao();
         Loaded += OnLoadedInicial;
@@ -59,7 +71,7 @@ public partial class ProdutoFormView : Window
     private async void OnLoadedInicial(object sender, RoutedEventArgs e)
     {
         Loaded -= OnLoadedInicial;
-        await CarregarComboBoxesAsync();
+        await CarregarComboBoxesAsync(_categoriaPendente, _marcaPendente, _fornecedorPendente);
         await CarregarRegimeTributarioAsync();
     }
 
@@ -101,11 +113,34 @@ public partial class ProdutoFormView : Window
         }
     }
 
+    // Categoria, marca e fornecedor do produto aberto para edição. Ficam guardados porque o
+    // formulário é preenchido ANTES de a janela abrir, e a lista de opções só é carregada
+    // depois (evento Loaded) — quem carrega por último precisa saber o que selecionar.
+    //
+    // Antes, InicializarEdicao disparava um carregamento COM os ids e o Loaded disparava outro
+    // SEM nenhum: o que terminasse por último vencia, e o do Loaded (sem ids) cai no primeiro
+    // item da lista. Resultado: produto da marca "Paraná Color" abria como "ATLAS", e o mesmo
+    // com categoria. Nada era gravado errado — só a tela mentia — mas salvar assim trocaria a
+    // marca do produto sem ninguém perceber.
+    private int? _categoriaPendente;
+    private int? _marcaPendente;
+    private int? _fornecedorPendente;
+
+    // Cada carregamento recebe um número; só o mais recente aplica o resultado. Cobre também o
+    // caso de dois carregamentos em voo, em que a resposta mais lenta (e mais velha) chegaria
+    // depois e sobrescreveria a seleção certa.
+    private int _geracaoCarregamentoCombos;
+
     private async Task CarregarComboBoxesAsync(int? categoriaId = null, int? marcaId = null, int? fornecedorId = null)
     {
+        var geracao = ++_geracaoCarregamentoCombos;
+
         var categorias = (await _categoriaService.ObterTodosAsync()).ToList();
         var marcas = (await _marcaService.ObterTodosAsync()).ToList();
         var fornecedores = (await _fornecedorService.ObterTodosAsync()).ToList();
+
+        if (geracao != _geracaoCarregamentoCombos)
+            return;
 
         CmbCategoria.ItemsSource = categorias;
         CmbMarca.ItemsSource = marcas;
@@ -128,6 +163,9 @@ public partial class ProdutoFormView : Window
     {
         TxtTitulo.Text = "Novo Produto";
         _produtoId = null;
+        _categoriaPendente = null;
+        _marcaPendente = null;
+        _fornecedorPendente = null;
         _quantidadeEstoqueCarregadaNaEdicao = null;
         _codigoDefinidoManualmente = false;
         _codigoDesbloqueadoManualmente = false;
@@ -142,7 +180,15 @@ public partial class ProdutoFormView : Window
         TxtNome.Text = string.Empty;
         TxtCodigoBarras.Text = string.Empty;
         TxtTamanhoEmbalagem.Text = string.Empty;
-        TxtPesoGramas.Text = string.Empty;
+        TxtPesoKg.Text = string.Empty;
+        TxtAlturaCm.Text = string.Empty;
+        TxtLarguraCm.Text = string.Empty;
+        TxtComprimentoCm.Text = string.Empty;
+        _imagemReferencia = null;
+        _imagemSelecionada = null;
+        _removerImagem = false;
+        AtualizarImagem();
+        TxtRegraFrete.Text = "Obrigatórios para novos produtos. Peso em kg (até 3 casas); dimensões em cm (até 2).";
         TxtObservacoes.Text = string.Empty;
         DpValidade.SelectedDate = null;
         ChkPromocaoAtiva.IsChecked = false;
@@ -198,7 +244,15 @@ public partial class ProdutoFormView : Window
             }
 
             TxtTamanhoEmbalagem.Text = produto.TamanhoEmbalagem ?? string.Empty;
-            TxtPesoGramas.Text = produto.PesoGramas?.ToString(CultureInfo.InvariantCulture) ?? string.Empty;
+            TxtPesoKg.Text = PesoProdutoHelper.EmQuilos(produto.PesoGramas)?.ToString("0.000", new CultureInfo("pt-BR")) ?? string.Empty;
+            TxtAlturaCm.Text = produto.AlturaCm?.ToString("0.00", new CultureInfo("pt-BR")) ?? string.Empty;
+            TxtLarguraCm.Text = produto.LarguraCm?.ToString("0.00", new CultureInfo("pt-BR")) ?? string.Empty;
+            TxtComprimentoCm.Text = produto.ComprimentoCm?.ToString("0.00", new CultureInfo("pt-BR")) ?? string.Empty;
+            _imagemReferencia = produto.ImagemProdutoPath;
+            _imagemSelecionada = null;
+            _removerImagem = false;
+            AtualizarImagem();
+            TxtRegraFrete.Text = "Produto existente: dados ainda não informados podem ser mantidos pendentes. Preencha antes do envio por transportadora.";
             AtualizarPesoEquivalente();
         }
         finally
@@ -207,7 +261,15 @@ public partial class ProdutoFormView : Window
         }
 
         AplicarEstadoCampoCodigo();
-        _ = CarregarComboBoxesAsync(produto.CategoriaId, produto.MarcaId, produto.FornecedorId);
+        _categoriaPendente = produto.CategoriaId;
+        _marcaPendente = produto.MarcaId;
+        _fornecedorPendente = produto.FornecedorId;
+
+        // Janela ainda não aberta: o Loaded carrega as listas com a seleção acima. Já aberta
+        // (formulário reaproveitado): carrega agora, senão as listas ficariam com a escolha antiga.
+        if (IsLoaded)
+            _ = CarregarComboBoxesAsync(_categoriaPendente, _marcaPendente, _fornecedorPendente);
+
         _ = CarregarTributacaoAsync(produto.Id);
     }
 
@@ -799,7 +861,20 @@ public partial class ProdutoFormView : Window
 
             if (!TentarLerPesoGramas(out var pesoGramas))
             {
-                ExibirErroValidacao("Peso inválido — informe só o número em gramas (ex.: 5500) ou deixe em branco.");
+                ExibirErroValidacao("Peso inválido — informe kg com até 3 casas decimais (ex.: 5,500).");
+                return;
+            }
+
+            if (!PesoProdutoHelper.TentarLerCentimetros(TxtAlturaCm.Text, out var altura)
+                || !PesoProdutoHelper.TentarLerCentimetros(TxtLarguraCm.Text, out var largura)
+                || !PesoProdutoHelper.TentarLerCentimetros(TxtComprimentoCm.Text, out var comprimento))
+            {
+                ExibirErroValidacao("Dimensões inválidas — informe valores maiores que zero em cm, com até 2 casas decimais.");
+                return;
+            }
+            if (!_produtoId.HasValue && (!pesoGramas.HasValue || !altura.HasValue || !largura.HasValue || !comprimento.HasValue))
+            {
+                ExibirErroValidacao("Informe peso, altura, largura e comprimento para cadastrar um novo produto.");
                 return;
             }
 
@@ -829,6 +904,12 @@ public partial class ProdutoFormView : Window
                     Unidade = unidade,
                     TamanhoEmbalagem = tamanhoEmbalagem,
                     PesoGramas = pesoGramas,
+                    AlturaCm = altura,
+                    LarguraCm = largura,
+                    ComprimentoCm = comprimento,
+                    AlterarImagem = _imagemSelecionada is not null,
+                    ImagemArquivoSelecionado = _imagemSelecionada,
+                    RemoverImagem = _removerImagem,
                     Custo = custo,
                     PrecoVenda = preco,
                     PromocaoAtiva = promocaoAtiva,
@@ -856,6 +937,12 @@ public partial class ProdutoFormView : Window
                     Unidade = unidade,
                     TamanhoEmbalagem = tamanhoEmbalagem,
                     PesoGramas = pesoGramas,
+                    AlturaCm = altura,
+                    LarguraCm = largura,
+                    ComprimentoCm = comprimento,
+                    AlterarImagem = _imagemSelecionada is not null,
+                    ImagemArquivoSelecionado = _imagemSelecionada,
+                    RemoverImagem = _removerImagem,
                     Custo = custo,
                     PrecoVenda = preco,
                     PromocaoAtiva = promocaoAtiva,
@@ -998,44 +1085,79 @@ public partial class ProdutoFormView : Window
         return false;
     }
 
-    private void TxtPesoGramas_TextChanged(object sender, TextChangedEventArgs e)
+    private void TxtFrete_TextChanged(object sender, TextChangedEventArgs e)
         => AtualizarPesoEquivalente();
 
-    /// <summary>
-    /// Eco em quilos ao lado do campo, enquanto o operador digita. O peso é guardado em
-    /// gramas, mas é em quilos que ele confere com a balança e com a embalagem — sem o eco,
-    /// um zero a mais ou a menos (550 / 55000) passa sem ninguém notar.
-    /// </summary>
     private void AtualizarPesoEquivalente()
     {
-        // TxtPesoEquivalente ainda é null enquanto o XAML está sendo montado, e o
-        // TextChanged do TextBox dispara antes disso.
-        if (TxtPesoEquivalente is null)
+        if (TxtPesoEquivalente is null || TxtFretePendente is null || TxtComprimentoCm is null)
             return;
-
-        var formatado = TentarLerPesoGramas(out var gramas) ? PesoProdutoHelper.Formatar(gramas) : string.Empty;
-
-        TxtPesoEquivalente.Text = formatado.Length == 0 ? string.Empty : $"= {formatado}";
-        TxtPesoEquivalente.Visibility = formatado.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
+        var valido = TentarLerPesoGramas(out var gramas);
+        TxtPesoEquivalente.Text = valido && gramas.HasValue ? $"= {gramas.Value} g" : string.Empty;
+        TxtPesoEquivalente.Visibility = TxtPesoEquivalente.Text.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
+        var pronto = valido && gramas is > 0
+            && PesoProdutoHelper.TentarLerCentimetros(TxtAlturaCm.Text, out var a) && a.HasValue
+            && PesoProdutoHelper.TentarLerCentimetros(TxtLarguraCm.Text, out var l) && l.HasValue
+            && PesoProdutoHelper.TentarLerCentimetros(TxtComprimentoCm.Text, out var c) && c.HasValue;
+        TxtFretePendente.Text = pronto ? "Pronto para frete" : "Dados de frete pendentes";
+        TxtFretePendente.SetResourceReference(TextBlock.ForegroundProperty, pronto ? "VerdeSucessoBrush" : "VermelhoErroBrush");
     }
 
-    /// <summary>Campo vazio é peso não informado (válido, devolve null); qualquer outra
-    /// coisa que não seja um inteiro de gramas é erro de digitação.</summary>
     private bool TentarLerPesoGramas(out int? pesoGramas)
+        => PesoProdutoHelper.TentarLerQuilos(TxtPesoKg.Text, out pesoGramas);
+
+    private void BtnSelecionarImagem_Click(object sender, RoutedEventArgs e)
     {
-        pesoGramas = null;
-
-        var texto = TxtPesoGramas.Text?.Trim();
-        if (string.IsNullOrWhiteSpace(texto))
-            return true;
-
-        if (!int.TryParse(texto, NumberStyles.Integer, CultureInfo.InvariantCulture, out var gramas) || gramas <= 0)
-            return false;
-
-        pesoGramas = gramas;
-        return true;
+        var arquivo = _dialogs.SelecionarImagem(this);
+        if (arquivo is null) return;
+        try
+        {
+            _imagens.ValidarArquivo(arquivo);
+            _imagemSelecionada = arquivo;
+            _removerImagem = false;
+            AtualizarImagem();
+        }
+        catch (DomainException ex) { ExibirErroValidacao(ex.Message); }
+        catch { ExibirErroValidacao("Não foi possível carregar a imagem selecionada."); }
     }
 
+    private void BtnRemoverImagem_Click(object sender, RoutedEventArgs e)
+    {
+        _imagemSelecionada = null;
+        _removerImagem = true;
+        AtualizarImagem();
+    }
+
+    private void AtualizarImagem()
+    {
+        if (ImgProduto is null || TxtImagemEstado is null) return;
+        ImgProduto.Source = null;
+        var possui = !_removerImagem && (_imagemSelecionada is not null || _imagemReferencia is not null);
+        BtnSelecionarImagem.Content = possui ? "Alterar imagem" : "Selecionar imagem";
+        BtnRemoverImagem.IsEnabled = possui;
+        TxtImagemEstado.Text = _removerImagem ? "Remoção pendente — será confirmada ao salvar."
+            : possui ? "Imagem principal do produto" : "Produto sem imagem";
+        if (!possui) return;
+        try
+        {
+            var arquivo = _imagemSelecionada ?? _imagens.ObterCaminhoSeguro(_imagemReferencia);
+            if (arquivo is null || !File.Exists(arquivo))
+            {
+                TxtImagemEstado.Text = "Imagem pendente — arquivo não encontrado. Selecione novamente.";
+                return;
+            }
+            using var stream = new FileStream(arquivo, FileMode.Open, FileAccess.Read, FileShare.Read);
+            var preview = new BitmapImage();
+            preview.BeginInit();
+            preview.CacheOption = BitmapCacheOption.OnLoad;
+            preview.DecodePixelWidth = 240;
+            preview.StreamSource = stream;
+            preview.EndInit();
+            preview.Freeze();
+            ImgProduto.Source = preview;
+        }
+        catch { TxtImagemEstado.Text = "Imagem pendente — arquivo inválido ou indisponível."; }
+    }
     private static int? ObterIdSelecionado(ComboBox combo)
     {
         return combo.SelectedValue switch
@@ -1053,7 +1175,7 @@ public partial class ProdutoFormView : Window
     {
         TxtErroValidacao.Text = mensagem;
         TxtErroValidacao.Visibility = Visibility.Visible;
-        MessageBox.Show(mensagem, "Validação", MessageBoxButton.OK, MessageBoxImage.Warning);
+        _dialogs.MostrarValidacao(this, mensagem);
     }
 
     private void LimparErroValidacao()

@@ -34,6 +34,7 @@ public class ProdutoEstoqueInicialTests
 
     private static CriarProdutoDto Dto(decimal estoque) => new()
     {
+        PesoGramas = 5500, AlturaCm = 25m, LarguraCm = 20m, ComprimentoCm = 30m,
         Nome = "Tinta Acrílica 18L",
         CodigoInterno = "TA001",
         CodigoInternoDefinidoManualmente = true,

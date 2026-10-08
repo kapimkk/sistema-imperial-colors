@@ -37,6 +37,7 @@
         <ScrollViewer Grid.Row="1" Margin="20,12,20,8" VerticalScrollBarVisibility="Auto"
                       helpers:ScrollViewerMouseWheelHelper.Habilitar="True">
             <StackPanel>
+                <TextBlock Text="DADOS DO PRODUTO" FontWeight="Bold" Margin="0,0,0,12"/>
                 <StackPanel Margin="0,0,0,12">
                     <TextBlock Style="{StaticResource LabelCampo}" Text="Nome do Produto *"/>
                     <TextBox x:Name="TxtNome" Style="{StaticResource TextBoxModerno}"
@@ -188,26 +189,6 @@
                                TextWrapping="Wrap"/>
                 </Grid>
 
-                <Grid Margin="0,0,0,12">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="200"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-                    <StackPanel Grid.Column="0">
-                        <TextBlock Style="{StaticResource LabelCampo}" Text="Peso (gramas)"/>
-                        <TextBox x:Name="TxtPesoGramas" Style="{StaticResource TextBoxNumerico}" MaxLength="7"
-                                 TextChanged="TxtPesoGramas_TextChanged"/>
-                    </StackPanel>
-                    <StackPanel Grid.Column="1" VerticalAlignment="Bottom" Margin="12,0,0,6">
-                        <TextBlock x:Name="TxtPesoEquivalente" FontSize="12" FontWeight="SemiBold"
-                                   Foreground="{StaticResource PretoPrimarioBrush}"
-                                   Visibility="Collapsed" Margin="0,0,0,2"/>
-                        <TextBlock FontSize="12" Foreground="{StaticResource CinzaTextoBrush}"
-                                   Text="Opcional, número inteiro em gramas — ex.: 5500 para uma lata de 5,5 kg."
-                                   TextWrapping="Wrap"/>
-                    </StackPanel>
-                </Grid>
-
                 <StackPanel Margin="0,0,0,12">
                     <CheckBox x:Name="ChkCustoTotal"
                               Content="Informar Valor Total da Compra"
@@ -253,13 +234,73 @@
                     </StackPanel>
                 </Border>
 
-                <StackPanel Margin="0,0,0,12">
-                    <TextBlock Style="{StaticResource LabelCampo}" Text="Observações"/>
-                    <TextBox x:Name="TxtObservacoes" Style="{StaticResource TextBoxModerno}"
-                             Height="70" TextWrapping="Wrap" AcceptsReturn="True"
-                             VerticalScrollBarVisibility="Auto"/>
-                </StackPanel>
+                <Border Style="{StaticResource Card}" Padding="15" Margin="0,0,0,12">
+                    <StackPanel>
+                        <TextBlock Text="DESCRIÇÃO" FontWeight="Bold" Margin="0,0,0,8"/>
+                        <TextBlock Style="{StaticResource LabelCampo}" Text="Descrição / Observações"/>
+                        <TextBox x:Name="TxtObservacoes" Style="{StaticResource TextBoxModerno}"
+                                 Height="90" TextWrapping="Wrap" AcceptsReturn="True" MaxLength="10000"
+                                 VerticalScrollBarVisibility="Auto"/>
+                        <TextBlock Text="Texto enviado ao site. As quebras de linha são preservadas; não use HTML."
+                                   TextWrapping="Wrap" FontSize="11" Foreground="{StaticResource CinzaTextoBrush}" Margin="0,6,0,0"/>
+                    </StackPanel>
+                </Border>
 
+                <Border Style="{StaticResource Card}" Padding="15" Margin="0,0,0,12">
+                    <StackPanel>
+                        <TextBlock Text="FRETE / DIMENSÕES" FontWeight="Bold" Margin="0,0,0,8"/>
+                        <TextBlock x:Name="TxtFretePendente" Text="Dados de frete pendentes" TextWrapping="Wrap"
+                                   Foreground="{StaticResource VermelhoErroBrush}" Margin="0,0,0,10"/>
+                        <UniformGrid Columns="4">
+                            <StackPanel Margin="0,0,8,0">
+                                <TextBlock Style="{StaticResource LabelCampo}" Text="Peso (kg)"/>
+                                <TextBox x:Name="TxtPesoKg" Style="{StaticResource TextBoxNumerico}" MaxLength="16"
+                                         TextChanged="TxtFrete_TextChanged"/>
+                                <TextBlock x:Name="TxtPesoEquivalente" FontSize="11" TextWrapping="Wrap" Visibility="Collapsed"/>
+                            </StackPanel>
+                            <StackPanel Margin="0,0,8,0">
+                                <TextBlock Style="{StaticResource LabelCampo}" Text="Altura (cm)"/>
+                                <TextBox x:Name="TxtAlturaCm" Style="{StaticResource TextBoxNumerico}" MaxLength="12"
+                                         TextChanged="TxtFrete_TextChanged"/>
+                            </StackPanel>
+                            <StackPanel Margin="0,0,8,0">
+                                <TextBlock Style="{StaticResource LabelCampo}" Text="Largura (cm)"/>
+                                <TextBox x:Name="TxtLarguraCm" Style="{StaticResource TextBoxNumerico}" MaxLength="12"
+                                         TextChanged="TxtFrete_TextChanged"/>
+                            </StackPanel>
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource LabelCampo}" Text="Comprimento (cm)"/>
+                                <TextBox x:Name="TxtComprimentoCm" Style="{StaticResource TextBoxNumerico}" MaxLength="12"
+                                         TextChanged="TxtFrete_TextChanged"/>
+                            </StackPanel>
+                        </UniformGrid>
+                        <TextBlock x:Name="TxtRegraFrete" Text="Obrigatórios para novos produtos. Peso com até 3 casas decimais; dimensões com até 2."
+                                   TextWrapping="Wrap" FontSize="11" Foreground="{StaticResource CinzaTextoBrush}" Margin="0,8,0,0"/>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource Card}" Padding="15" Margin="0,0,0,12">
+                    <StackPanel>
+                        <TextBlock Text="IMAGEM DO PRODUTO" FontWeight="Bold" Margin="0,0,0,8"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="130"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <Border Background="{StaticResource CinzaClaroBrush}" Padding="6" CornerRadius="6">
+                                <Image x:Name="ImgProduto" Height="115" Width="115" Stretch="Uniform"/>
+                            </Border>
+                            <StackPanel Grid.Column="1" Margin="14,0,0,0" VerticalAlignment="Center">
+                                <TextBlock x:Name="TxtImagemEstado" Text="Produto sem imagem" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                                <WrapPanel>
+                                    <Button x:Name="BtnSelecionarImagem" Content="Selecionar imagem" Style="{StaticResource BotaoSecundario}"
+                                            Click="BtnSelecionarImagem_Click" Margin="0,0,8,0"/>
+                                    <Button x:Name="BtnRemoverImagem" Content="Remover imagem" Style="{StaticResource BotaoSecundario}"
+                                            Click="BtnRemoverImagem_Click" IsEnabled="False"/>
+                                </WrapPanel>
+                                <TextBlock Text="JPEG ou PNG, até 5 MB. A imagem principal será enviada ao site."
+                                           FontSize="11" TextWrapping="Wrap" Foreground="{StaticResource CinzaTextoBrush}" Margin="0,8,0,0"/>
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+                </Border>
                 <Expander x:Name="ExpTributacao"
                           Header="Tributação (NCM, ICMS, PIS/COFINS, IPI) — opcional"
                           FontWeight="SemiBold" IsExpanded="False">

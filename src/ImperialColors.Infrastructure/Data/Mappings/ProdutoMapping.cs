@@ -8,7 +8,13 @@ public class ProdutoMapping : IEntityTypeConfiguration<Produto>
 {
     public void Configure(EntityTypeBuilder<Produto> builder)
     {
-        builder.ToTable("produtos");
+        builder.ToTable("produtos", tabela =>
+        {
+            tabela.HasCheckConstraint("CK_produtos_dimensoes_positivas",
+                "(altura_cm IS NULL OR altura_cm > 0) AND (largura_cm IS NULL OR largura_cm > 0) AND (comprimento_cm IS NULL OR comprimento_cm > 0)");
+            tabela.HasCheckConstraint("CK_produtos_imagem_removida",
+                "NOT imagem_removida OR imagem_produto_path IS NULL");
+        });
         builder.HasKey(p => p.Id);
         builder.Property(p => p.Id).HasColumnName("id").UseIdentityAlwaysColumn();
         builder.Property(p => p.CodigoInterno).HasColumnName("codigo_interno").HasMaxLength(50).IsRequired();
@@ -21,6 +27,11 @@ public class ProdutoMapping : IEntityTypeConfiguration<Produto>
         builder.Property(p => p.Unidade).HasColumnName("unidade").HasMaxLength(10);
         builder.Property(p => p.TamanhoEmbalagem).HasColumnName("tamanho_embalagem").HasMaxLength(30).IsRequired(false);
         builder.Property(p => p.PesoGramas).HasColumnName("peso_gramas").IsRequired(false);
+        builder.Property(p => p.AlturaCm).HasColumnName("altura_cm").HasPrecision(10, 2).IsRequired(false);
+        builder.Property(p => p.LarguraCm).HasColumnName("largura_cm").HasPrecision(10, 2).IsRequired(false);
+        builder.Property(p => p.ComprimentoCm).HasColumnName("comprimento_cm").HasPrecision(10, 2).IsRequired(false);
+        builder.Property(p => p.ImagemProdutoPath).HasColumnName("imagem_produto_path").HasMaxLength(200).IsRequired(false);
+        builder.Property(p => p.ImagemRemovida).HasColumnName("imagem_removida").HasDefaultValue(false);
         builder.Property(p => p.Custo).HasColumnName("custo").HasPrecision(10, 2).IsRequired(false);
         builder.Property(p => p.PrecoVenda).HasColumnName("preco_venda").HasPrecision(10, 2);
         builder.Property(p => p.PromocaoAtiva).HasColumnName("promocao_ativa");

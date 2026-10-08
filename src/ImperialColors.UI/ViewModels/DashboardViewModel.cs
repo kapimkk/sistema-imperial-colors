@@ -88,6 +88,31 @@ public class DashboardViewModel : BaseViewModel
     private List<VendaDestaqueDto> _maioresVendas = new();
     public List<VendaDestaqueDto> MaioresVendas { get => _maioresVendas; set => SetProperty(ref _maioresVendas, value); }
 
+    private PeriodoDashboard _periodoProdutosVendidos = PeriodoDashboard.Mes;
+    public PeriodoDashboard PeriodoProdutosVendidos { get => _periodoProdutosVendidos; private set => SetProperty(ref _periodoProdutosVendidos, value); }
+
+    public bool PeriodoEhMes => PeriodoProdutosVendidos == PeriodoDashboard.Mes;
+    public bool PeriodoEhTotal => PeriodoProdutosVendidos == PeriodoDashboard.Total;
+
+    private string SufixoPeriodo => PeriodoEhTotal ? "total" : "mês";
+    public string TituloItensPorCategoria => $"Itens Vendidos por Categoria ({SufixoPeriodo})";
+    public string TituloMaisVendidos => $"5 Mais Vendidos ({SufixoPeriodo})";
+    public string MensagemSemItensVendidos => PeriodoEhTotal
+        ? "Nenhum item vendido até agora."
+        : "Nenhum item vendido neste mês.";
+
+    public RelayCommand<PeriodoDashboard> TrocarPeriodoProdutosCommand { get; }
+
+    private List<CategoriaItensVendidosDto> _itensPorCategoria = new();
+    public List<CategoriaItensVendidosDto> ItensPorCategoria { get => _itensPorCategoria; set => SetProperty(ref _itensPorCategoria, value); }
+
+    private List<ProdutoMaisVendidoDto> _produtosMaisVendidosMes = new();
+    public List<ProdutoMaisVendidoDto> ProdutosMaisVendidosMes { get => _produtosMaisVendidosMes; set => SetProperty(ref _produtosMaisVendidosMes, value); }
+
+    /// <summary>Sem item vendido no mês, os dois cards mostram uma mensagem em vez de uma
+    /// área vazia que parece falha de carregamento.</summary>
+    public bool SemItensVendidosNoMes => ItensPorCategoria.Count == 0;
+
     // --- Comissões de venda externa ---
 
     private decimal _comissoesAPagar;
@@ -120,6 +145,7 @@ public class DashboardViewModel : BaseViewModel
         // "private async void Btn_Click" já usados em toda a UI do projeto) — o try/catch
         // dentro de cada CarregarXAsync garante que nenhuma exceção escapa do handler.
         TrocarVisaoCommand = new RelayCommand<VisaoDashboard>(async v => await TrocarVisaoAsync(v));
+        TrocarPeriodoProdutosCommand = new RelayCommand<PeriodoDashboard>(async p => await TrocarPeriodoProdutosAsync(p));
     }
 
     /// <summary>Carregamento inicial ao navegar para o Dashboard — chamado direto pela
@@ -237,6 +263,58 @@ public class DashboardViewModel : BaseViewModel
         }
     }
 
+    /// <summary>Trocar Mês/Total recarrega só os dois blocos de produtos — as "Maiores Vendas"
+    /// continuam sendo do mês e não precisam ser buscadas de novo.</summary>
+    private async Task TrocarPeriodoProdutosAsync(PeriodoDashboard periodo)
+    {
+        if (periodo == PeriodoProdutosVendidos)
+        {
+            // Clicar no botão já marcado desmarcaria o ToggleButton na tela; avisar a UI
+            // devolve o estado que o ViewModel considera verdadeiro.
+            NotificarPeriodo();
+            return;
+        }
+
+        PeriodoProdutosVendidos = periodo;
+        NotificarPeriodo();
+        await CarregarProdutosVendidosAsync();
+    }
+
+    private void NotificarPeriodo()
+    {
+        OnPropertyChanged(nameof(PeriodoEhMes));
+        OnPropertyChanged(nameof(PeriodoEhTotal));
+        OnPropertyChanged(nameof(TituloItensPorCategoria));
+        OnPropertyChanged(nameof(TituloMaisVendidos));
+        OnPropertyChanged(nameof(MensagemSemItensVendidos));
+    }
+
+    private async Task CarregarProdutosVendidosAsync()
+    {
+        // Guarda o período pedido: se o operador alternar Mês/Total rápido, a resposta mais
+        // lenta de uma consulta antiga não pode sobrescrever a tela do período atual.
+        var periodoPedido = PeriodoProdutosVendidos;
+        try
+        {
+            Carregando = true;
+            var dados = await _dashboardService.ObterProdutosVendidosAsync(periodoPedido);
+            if (periodoPedido != PeriodoProdutosVendidos)
+                return;
+
+            ItensPorCategoria = dados.ItensPorCategoria;
+            ProdutosMaisVendidosMes = dados.ProdutosMaisVendidos;
+            OnPropertyChanged(nameof(SemItensVendidosNoMes));
+        }
+        catch (Exception ex)
+        {
+            MostrarErro($"Erro ao carregar produtos vendidos: {ex.Message}");
+        }
+        finally
+        {
+            Carregando = false;
+        }
+    }
+
     private async Task CarregarVendasAsync(bool forcar)
     {
         if (_vendasCarregado && !forcar) return;
@@ -246,6 +324,7 @@ public class DashboardViewModel : BaseViewModel
             Carregando = true;
             var dados = await _dashboardService.ObterVisaoVendasAsync();
             MaioresVendas = dados.MaioresVendas;
+            await CarregarProdutosVendidosAsync();
             _vendasCarregado = true;
         }
         catch (Exception ex)

@@ -14,7 +14,7 @@ internal static class WpfTestBootstrap
             return;
 
         if (System.Windows.Application.Current == null)
-            _ = new System.Windows.Application();
+            _ = new System.Windows.Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
 
         FormattingHelper.ConfigurarCulturaThread();
         _inicializado = true;

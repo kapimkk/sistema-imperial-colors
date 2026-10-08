@@ -38,7 +38,8 @@ public interface IProdutoRepository : IRepository<Produto>
         decimal quantidadeDesejada,
         string? motivoAjuste,
         string? usuarioAjuste,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        bool alterarImagem = false);
 
     Task<Produto?> ObterPorCodigoInternoAsync(string codigoInterno);
     Task<Produto?> ObterPorCodigoBarrasAsync(string codigoBarras);

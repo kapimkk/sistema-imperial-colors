@@ -92,7 +92,8 @@ public class ProdutoRepository : RepositoryBase<Produto>, IProdutoRepository
         decimal quantidadeDesejada,
         string? motivoAjuste,
         string? usuarioAjuste,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool alterarImagem = false)
     {
         return await ExecutarEmTransacaoAsync(async context =>
         {
@@ -102,6 +103,12 @@ public class ProdutoRepository : RepositoryBase<Produto>, IProdutoRepository
             // obsoleto que estava em memória quando a tela de edição foi aberta).
             context.Set<Produto>().Update(produto);
             context.Entry(produto).Property(p => p.QuantidadeEstoque).IsModified = false;
+            // Uma edição aberta antes de outra troca de imagem não pode restaurar referência antiga.
+            if (!alterarImagem)
+            {
+                context.Entry(produto).Property(p => p.ImagemProdutoPath).IsModified = false;
+                context.Entry(produto).Property(p => p.ImagemRemovida).IsModified = false;
+            }
             await context.SaveChangesAsync(cancellationToken);
 
             // Delta = o que o usuário pretendia mudar (digitado - baseline que ele viu),
@@ -145,6 +152,15 @@ public class ProdutoRepository : RepositoryBase<Produto>, IProdutoRepository
                 produto.QuantidadeEstoque = qtdAtual;
             }
 
+            if (!alterarImagem)
+            {
+                var imagemAtual = await context.Set<Produto>()
+                    .Where(p => p.Id == produto.Id)
+                    .Select(p => new {p.ImagemProdutoPath,p.ImagemRemovida})
+                    .FirstAsync(cancellationToken);
+                produto.ImagemProdutoPath = imagemAtual.ImagemProdutoPath;
+                produto.ImagemRemovida = imagemAtual.ImagemRemovida;
+            }
             return produto;
         }, cancellationToken);
     }

@@ -81,6 +81,13 @@ public class DashboardServiceTests
         analyticsMock
             .Setup(a => a.ObterRankingProdutosAsync(It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<TipoAnaliseGiroProduto>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<ProdutoRankingDto>());
+        // A visão de vendas também pede itens por categoria e o top 5 com nº de vendas.
+        analyticsMock
+            .Setup(a => a.ObterItensVendidosPorCategoriaAsync(It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<CategoriaItensVendidosDto>());
+        analyticsMock
+            .Setup(a => a.ObterProdutosMaisVendidosComVendasAsync(It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<ProdutoMaisVendidoDto>());
 
         return (vendaMock, produtoMock, produtoServiceMock, analyticsMock);
     }

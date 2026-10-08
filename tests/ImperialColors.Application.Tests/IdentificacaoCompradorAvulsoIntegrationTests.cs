@@ -48,8 +48,8 @@ public class IdentificacaoCompradorAvulsoIntegrationTests
         var categoria = await categoriaRepo.AdicionarAsync(new Categoria { Nome = $"CatAvulso{sufixo}", Ativo = true });
         var marca = await marcaRepo.AdicionarAsync(new Marca { Nome = $"MarcaAvulso{sufixo}", Ativo = true });
 
-        return await produtoService.CriarAsync(new CriarProdutoDto
-        {
+        return await produtoService.CriarAsync(new CriarProdutoDto {
+                    PesoGramas = 5500, AlturaCm = 25m, LarguraCm = 20m, ComprimentoCm = 30m,
             CodigoInterno = await produtoService.GerarProximoCodigoInternoAsync(),
             Nome = $"ProdutoAvulso{sufixo}",
             CategoriaId = categoria.Id,

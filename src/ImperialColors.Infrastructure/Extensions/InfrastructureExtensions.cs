@@ -71,6 +71,7 @@ public static class InfrastructureExtensions
         services.AddSingleton<IParametroSistemaRepository, ParametroSistemaRepository>();
         services.AddSingleton<ICoordenacaoAtualizacaoBancoService, CoordenacaoAtualizacaoBancoService>();
 
+        services.AddSingleton<IImagemProdutoStorage, ImagemProdutoStorage>();
         services.AddSingleton<IProdutoRepository, ProdutoRepository>();
         services.AddSingleton<IVendaRepository, VendaRepository>();
         services.AddSingleton<IClienteRepository, ClienteRepository>();

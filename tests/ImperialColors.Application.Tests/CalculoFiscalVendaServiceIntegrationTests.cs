@@ -50,8 +50,8 @@ public class CalculoFiscalVendaServiceIntegrationTests
         var categoria = await categoriaRepo.AdicionarAsync(new Categoria { Nome = $"CatCalculo{sufixo}", Ativo = true });
         var marca = await marcaRepo.AdicionarAsync(new Marca { Nome = $"MarcaCalculo{sufixo}", Ativo = true });
 
-        var produto = await produtoService.CriarAsync(new CriarProdutoDto
-        {
+        var produto = await produtoService.CriarAsync(new CriarProdutoDto {
+                    PesoGramas = 5500, AlturaCm = 25m, LarguraCm = 20m, ComprimentoCm = 30m,
             CodigoInterno = await produtoService.GerarProximoCodigoInternoAsync(),
             Nome = $"ProdutoCalculo{sufixo}",
             CategoriaId = categoria.Id,
@@ -145,8 +145,8 @@ public class CalculoFiscalVendaServiceIntegrationTests
         var categoria = await categoriaRepo.AdicionarAsync(new Categoria { Nome = $"CatSemTrib{sufixo}", Ativo = true });
         var marca = await marcaRepo.AdicionarAsync(new Marca { Nome = $"MarcaSemTrib{sufixo}", Ativo = true });
 
-        var produto = await produtoService.CriarAsync(new CriarProdutoDto
-        {
+        var produto = await produtoService.CriarAsync(new CriarProdutoDto {
+                    PesoGramas = 5500, AlturaCm = 25m, LarguraCm = 20m, ComprimentoCm = 30m,
             CodigoInterno = await produtoService.GerarProximoCodigoInternoAsync(),
             Nome = $"ProdutoSemTrib{sufixo}",
             CategoriaId = categoria.Id,

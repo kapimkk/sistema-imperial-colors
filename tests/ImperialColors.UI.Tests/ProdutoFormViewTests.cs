@@ -162,7 +162,7 @@ public class ProdutoFormViewTests
     /// campo é o que impede um zero a mais (55000) de passar batido. Cobre também a volta
     /// ao formulário em branco, para o peso do produto anterior não ficar na tela.</summary>
     [StaFact]
-    public void ProdutoFormView_PesoEmGramasEcoaOEquivalenteEmQuilos()
+    public void ProdutoFormView_PesoEmQuilosPreservaGramasExatos()
     {
         var form = CriarForm();
 
@@ -170,15 +170,15 @@ public class ProdutoFormViewTests
         produto.PesoGramas = 5500;
         form.InicializarEdicao(produto);
 
-        var campo = form.FindName("TxtPesoGramas") as TextBox;
+        var campo = form.FindName("TxtPesoKg") as TextBox;
         var eco = form.FindName("TxtPesoEquivalente") as TextBlock;
         Assert.NotNull(campo);
         Assert.NotNull(eco);
-        Assert.Equal("5500", campo!.Text);
-        Assert.Equal("= 5,5 kg", eco!.Text);
+        Assert.Equal("5,500", campo!.Text);
+        Assert.Equal("= 5500 g", eco!.Text);
         Assert.Equal(Visibility.Visible, eco.Visibility);
 
-        campo.Text = "800";
+        campo.Text = "0,800";
         Assert.Equal("= 800 g", eco.Text);
 
         // Texto que não é peso não ecoa nada — quem barra de fato é a validação ao salvar.
@@ -192,6 +192,104 @@ public class ProdutoFormViewTests
         form.Close();
     }
 
+    [StaFact]
+    public void ProdutoFormView_FreteExibeUnidadesEDimensoesExatas()
+    {
+        var form = CriarForm();
+        var produto = CriarProdutoExemplo();
+        produto.PesoGramas = 5500;
+        produto.AlturaCm = 25.25m;
+        produto.LarguraCm = 20.10m;
+        produto.ComprimentoCm = 30.99m;
+        form.InicializarEdicao(produto);
+        Assert.Equal("5,500", ((TextBox)form.FindName("TxtPesoKg")).Text);
+        Assert.Equal("25,25", ((TextBox)form.FindName("TxtAlturaCm")).Text);
+        Assert.Equal("20,10", ((TextBox)form.FindName("TxtLarguraCm")).Text);
+        Assert.Equal("30,99", ((TextBox)form.FindName("TxtComprimentoCm")).Text);
+        Assert.Equal("Pronto para frete", ((TextBlock)form.FindName("TxtFretePendente")).Text);
+        ((TextBox)form.FindName("TxtAlturaCm")).Text = "0";
+        Assert.Equal("Dados de frete pendentes", ((TextBlock)form.FindName("TxtFretePendente")).Text);
+        form.Close();
+    }
+
+    [StaFact]
+    public void ProdutoFormView_LegadoSemDimensoesNaoRecebeValoresFicticios()
+    {
+        var form = CriarForm();
+        form.InicializarEdicao(CriarProdutoExemplo());
+        Assert.Equal(string.Empty, ((TextBox)form.FindName("TxtPesoKg")).Text);
+        Assert.Equal(string.Empty, ((TextBox)form.FindName("TxtAlturaCm")).Text);
+        Assert.Equal(string.Empty, ((TextBox)form.FindName("TxtLarguraCm")).Text);
+        Assert.Equal(string.Empty, ((TextBox)form.FindName("TxtComprimentoCm")).Text);
+        Assert.Equal("Dados de frete pendentes", ((TextBlock)form.FindName("TxtFretePendente")).Text);
+        Assert.Contains("existente", ((TextBlock)form.FindName("TxtRegraFrete")).Text);
+        form.InicializarNovo();
+        Assert.Contains("Obrigatórios", ((TextBlock)form.FindName("TxtRegraFrete")).Text);
+        form.Close();
+    }
+
+    [StaFact]
+    public void ProdutoFormView_ObservacoesPreservaTextoEQuebras()
+    {
+        var form = CriarForm();
+        var produto = CriarProdutoExemplo();
+        produto.Observacoes = "Descrição & <texto>\n" + new string('a',600);
+        form.InicializarEdicao(produto);
+        Assert.Equal(produto.Observacoes,((TextBox)form.FindName("TxtObservacoes")).Text);
+        form.Close();
+    }
+
+    [StaFact]
+    public void ProdutoFormView_ImagemAusenteMostraPendenciaESemRemocaoAutomatica()
+    {
+        var form = CriarForm();
+        var produto = CriarProdutoExemplo();
+        produto.ImagemProdutoPath = "ImagensProdutos/11223344556677889900aabbccddeeff.png";
+        form.InicializarEdicao(produto);
+        Assert.Contains("não encontrado",((TextBlock)form.FindName("TxtImagemEstado")).Text);
+        Assert.True(((Button)form.FindName("BtnRemoverImagem")).IsEnabled);
+        Assert.Null(((Image)form.FindName("ImgProduto")).Source);
+        ((Button)form.FindName("BtnRemoverImagem")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Assert.Contains("ao salvar",((TextBlock)form.FindName("TxtImagemEstado")).Text);
+        Assert.False(((Button)form.FindName("BtnRemoverImagem")).IsEnabled);
+        form.Close();
+    }
+    [StaFact]
+    public void ProdutoFormView_PreviewNaoTravaArquivoERemocaoAguardaSalvar()
+    {
+        var raiz = System.IO.Path.Combine(System.IO.Path.GetTempPath(),"imperial_ui_image_test_"+Guid.NewGuid().ToString("N"));
+        var imagens = System.IO.Path.Combine(raiz,"ImagensProdutos");
+        System.IO.Directory.CreateDirectory(imagens);
+        var referencia = "ImagensProdutos/"+Guid.NewGuid().ToString("N")+".png";
+        var arquivo = System.IO.Path.Combine(raiz,referencia);
+        using (var bitmap = new System.Drawing.Bitmap(2,2)) bitmap.Save(arquivo,System.Drawing.Imaging.ImageFormat.Png);
+        var form = new ProdutoFormView(CriarProdutoServiceMock().Object,CriarCategoriaServiceMock().Object,
+            CriarMarcaServiceMock().Object,CriarFornecedorServiceMock().Object,
+            Mock.Of<IConfiguracaoFiscalService>(),Mock.Of<INcmService>(),
+            new ImperialColors.Infrastructure.Services.ImagemProdutoStorage(raiz));
+        try
+        {
+            var produto = CriarProdutoExemplo();
+            produto.ImagemProdutoPath = referencia;
+            form.InicializarEdicao(produto);
+            Assert.NotNull(((Image)form.FindName("ImgProduto")).Source);
+            Assert.Equal("Alterar imagem",((Button)form.FindName("BtnSelecionarImagem")).Content);
+            using (var semLock = new System.IO.FileStream(arquivo,System.IO.FileMode.Open,System.IO.FileAccess.ReadWrite,System.IO.FileShare.None))
+                Assert.True(semLock.Length > 0);
+            ((Button)form.FindName("BtnRemoverImagem")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Assert.Null(((Image)form.FindName("ImgProduto")).Source);
+            Assert.True(System.IO.File.Exists(arquivo));
+            Assert.Contains("ao salvar",((TextBlock)form.FindName("TxtImagemEstado")).Text);
+        }
+        finally
+        {
+            form.Close();
+            var caminho = System.IO.Path.GetFullPath(raiz);
+            if(caminho.StartsWith(System.IO.Path.Combine(System.IO.Path.GetTempPath(),"imperial_ui_image_test_"),StringComparison.OrdinalIgnoreCase)
+                && (System.IO.File.GetAttributes(caminho) & System.IO.FileAttributes.ReparsePoint)==0)
+                System.IO.Directory.Delete(caminho,true);
+        }
+    }
     private static Mock<IProdutoService> CriarProdutoServiceMock()
     {
         var mock = new Mock<IProdutoService>();

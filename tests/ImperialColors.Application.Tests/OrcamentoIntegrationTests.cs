@@ -51,8 +51,8 @@ public class OrcamentoIntegrationTests
 
     private static async Task<ProdutoDto> CriarProdutoAsync(
         IProdutoService produtoService, int categoriaId, int marcaId, string sufixo, decimal estoque)
-        => await produtoService.CriarAsync(new CriarProdutoDto
-        {
+        => await produtoService.CriarAsync(new CriarProdutoDto {
+                    PesoGramas = 5500, AlturaCm = 25m, LarguraCm = 20m, ComprimentoCm = 30m,
             Nome = $"Tinta Orçamento {sufixo}",
             CodigoInterno = $"ORC-{sufixo}",
             CodigoInternoDefinidoManualmente = true,

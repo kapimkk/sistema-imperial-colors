@@ -6,11 +6,9 @@ namespace ImperialColors.Application.Helpers;
 /// Conversão e exibição do peso do produto, guardado em gramas
 /// (<see cref="Domain.Entities.Produto.PesoGramas"/>).
 ///
-/// Gramas é a unidade de armazenamento porque o operador digita um inteiro, sem vírgula
-/// para errar; quilos é a unidade de leitura — é como o peso aparece na balança, na carga
-/// e no peso bruto/líquido da NF-e. A conversão mora aqui para as duas não se perderem
-/// pelo caminho.
-/// </summary>
+/// A tela aceita kg decimais, mas a persistência mantém gramas inteiros. A leitura não
+/// arredonda pesos subgrama nem aceita separador de milhares ambíguo.
+/// /// </summary>
 public static class PesoProdutoHelper
 {
     /// <summary>Cultura fixa em vez de <c>CurrentCulture</c>: "5,5 kg" com vírgula decimal
@@ -21,12 +19,34 @@ public static class PesoProdutoHelper
 
     public const int GramasPorQuilo = 1000;
 
-    /// <summary>Teto de sanidade: 1 tonelada por unidade. Não existe item de tinta ou
-    /// acessório que pese mais que isso — um valor acima é o preço ou o código de barras
-    /// digitado no campo errado, e é melhor barrar na hora do que carregar um peso absurdo
-    /// para dentro da nota fiscal.</summary>
-    public const int PesoMaximoGramas = 1_000_000;
+    /// <summary>Não arredonda gramas: até três casas decimais em kg, sem separador de milhares.</summary>
+    public static bool TentarLerQuilos(string? texto, out int? gramas)
+    {
+        gramas = null;
+        if (string.IsNullOrWhiteSpace(texto)) return true;
+        var normalizado = texto.Trim().Replace(',', '.');
+        if (!decimal.TryParse(normalizado, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var kg)
+            || kg <= 0 || kg > int.MaxValue / (decimal)GramasPorQuilo
+            || decimal.Truncate(kg * GramasPorQuilo) != kg * GramasPorQuilo)
+            return false;
+        gramas = checked((int)(kg * GramasPorQuilo));
+        return true;
+    }
 
+    public static bool TentarLerCentimetros(string? texto, out decimal? centimetros)
+    {
+        centimetros = null;
+        if (string.IsNullOrWhiteSpace(texto)) return true;
+        if (!decimal.TryParse(texto.Trim().Replace(',', '.'), NumberStyles.AllowDecimalPoint,
+                CultureInfo.InvariantCulture, out var valor)
+            || valor <= 0 || valor >= 100_000_000m || decimal.Round(valor, 2) != valor)
+            return false;
+        centimetros = valor;
+        return true;
+    }
+
+    /// <summary>Limite técnico de armazenamento em gramas (int32), não limite da Frenet/transportadoras.</summary>
+    public const int PesoMaximoGramas = int.MaxValue;
     /// <summary>Peso em quilos, como a NF-e espera (tags <c>pesoB</c>/<c>pesoL</c>).</summary>
     public static decimal? EmQuilos(int? gramas)
         => gramas.HasValue ? gramas.Value / (decimal)GramasPorQuilo : null;

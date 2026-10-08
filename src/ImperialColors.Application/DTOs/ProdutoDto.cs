@@ -18,6 +18,12 @@ public class ProdutoDto
     public string? TamanhoEmbalagem { get; set; }
     /// <summary>Peso da unidade em gramas — ver <see cref="Domain.Entities.Produto.PesoGramas"/>.</summary>
     public int? PesoGramas { get; set; }
+    public decimal? AlturaCm { get; set; }
+    public decimal? LarguraCm { get; set; }
+    public decimal? ComprimentoCm { get; set; }
+    public string? ImagemProdutoPath { get; set; }
+    /// <summary>Remoção explícita; arquivo ausente nunca equivale a ordem de excluir no site.</summary>
+    public bool ImagemRemovida { get; set; }
     public decimal? Custo { get; set; }
     public decimal PrecoVenda { get; set; }
     public bool PromocaoAtiva { get; set; }
@@ -55,6 +61,12 @@ public class CriarProdutoDto
     public string? TamanhoEmbalagem { get; set; }
     /// <summary>Peso da unidade em gramas — ver <see cref="Domain.Entities.Produto.PesoGramas"/>.</summary>
     public int? PesoGramas { get; set; }
+    public decimal? AlturaCm { get; set; }
+    public decimal? LarguraCm { get; set; }
+    public decimal? ComprimentoCm { get; set; }
+    public string? ImagemProdutoPath { get; set; }
+    /// <summary>Remoção explícita; arquivo ausente nunca equivale a ordem de excluir no site.</summary>
+    public bool ImagemRemovida { get; set; }
     public decimal? Custo { get; set; }
     public decimal PrecoVenda { get; set; }
     public bool PromocaoAtiva { get; set; }
@@ -62,6 +74,10 @@ public class CriarProdutoDto
     public DateTime? DataValidade { get; set; }
     public int? FornecedorId { get; set; }
     public string? Observacoes { get; set; }
+    /// <summary>Arquivo local escolhido, somente entrada transitória; nunca persistido no banco.</summary>
+    public string? ImagemArquivoSelecionado { get; set; }
+    public bool AlterarImagem { get; set; }
+    public bool RemoverImagem { get; set; }
     public bool CodigoInternoDefinidoManualmente { get; set; }
 }
 

@@ -41,16 +41,17 @@ public static class ProdutoValidator
                 $"Unidade de medida inválida. Use: {string.Join(", ", UnidadesMedida.Todas)}.");
 
         ValidarPeso(dto.PesoGramas);
+        ValidarDimensao(dto.AlturaCm, "Altura");
+        ValidarDimensao(dto.LarguraCm, "Largura");
+        ValidarDimensao(dto.ComprimentoCm, "Comprimento");
+        if (dto.Observacoes?.Length > 10_000)
+            throw new DomainException("A descrição deve ter no máximo 10.000 caracteres.");
+        if (dto.RemoverImagem && dto.AlterarImagem)
+            throw new DomainException("Selecione a alteração ou remoção da imagem, não ambas.");
         ValidarPromocao(dto.PromocaoAtiva, dto.PrecoPromocional, dto.PrecoVenda);
     }
 
-    /// <summary>
-    /// O peso é opcional, mas quando informado tem que ser um peso plausível. Zero ou
-    /// negativo não é "sem peso" — é campo preenchido errado, e guardado assim estraga
-    /// qualquer soma de carga. O teto pega o engano de digitar preço ou código de barras
-    /// no campo de peso, que passaria despercebido até alguém ver uma nota fiscal com
-    /// sete toneladas de tinta.
-    /// </summary>
+    /// <summary>Legado pode continuar nulo. Valor informado é positivo; transportadoras definem seus limites.</summary>
     private static void ValidarPeso(int? pesoGramas)
     {
         if (pesoGramas is null)
@@ -59,9 +60,22 @@ public static class ProdutoValidator
         if (pesoGramas <= 0)
             throw new DomainException("Peso, quando informado, deve ser maior que zero.");
 
-        if (pesoGramas > PesoProdutoHelper.PesoMaximoGramas)
-            throw new DomainException(
-                $"Peso acima do limite ({PesoProdutoHelper.PesoMaximoGramas / PesoProdutoHelper.GramasPorQuilo} kg por unidade) — confira se digitou em gramas.");
+    }
+
+    public static void ValidarNovo(CriarProdutoDto dto)
+    {
+        Validar(dto);
+        if (!dto.PesoGramas.HasValue || !dto.AlturaCm.HasValue || !dto.LarguraCm.HasValue || !dto.ComprimentoCm.HasValue)
+            throw new DomainException("Informe peso, altura, largura e comprimento para cadastrar um novo produto.");
+    }
+
+    private static void ValidarDimensao(decimal? valor, string nome)
+    {
+        if (valor is null) return;
+        if (valor <= 0)
+            throw new DomainException($"{nome}, quando informada, deve ser maior que zero (cm).");
+        if (valor >= 100_000_000m || decimal.Round(valor.Value, 2) != valor.Value)
+            throw new DomainException($"{nome} deve ter no máximo duas casas decimais e caber no campo em cm.");
     }
 
     private static void ValidarPromocao(bool promocaoAtiva, decimal? precoPromocional, decimal precoVenda)

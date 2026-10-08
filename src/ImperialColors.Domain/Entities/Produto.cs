@@ -18,17 +18,17 @@ public class Produto : BaseEntity
     public string? TamanhoEmbalagem { get; set; }
 
     /// <summary>
-    /// Peso da unidade em GRAMAS, inteiro. A unidade é fixa (e está no nome da propriedade)
-    /// de propósito: o campo só serve para somar carga e alimentar o peso bruto/líquido da
-    /// NF-e se cada produto estiver na mesma escala — com "peso" livre, um operador digita
-    /// 5500 pensando em gramas e outro digita 5,5 pensando em quilos, e a soma não vale
-    /// nada. Gramas em vez de quilos com decimal porque o operador digita um inteiro, sem
-    /// vírgula para errar; a tela mostra o equivalente em kg ao lado.
-    ///
-    /// Nulo para produto sem peso cadastrado — é o caso de todo o catálogo existente, e de
-    /// itens em que o peso não faz sentido (serviço, pincel avulso).
+    /// Peso exato da unidade em gramas (int32). A tela aceita kg com até três casas
+    /// decimais e converte sem arredondar. Nulo preserva cadastros legados incompletos;
+    /// novos produtos exigem peso e dimensões positivos.
     /// </summary>
     public int? PesoGramas { get; set; }
+    public decimal? AlturaCm { get; set; }
+    public decimal? LarguraCm { get; set; }
+    public decimal? ComprimentoCm { get; set; }
+    public string? ImagemProdutoPath { get; set; }
+    /// <summary>Remoção explícita; arquivo ausente nunca equivale a ordem de excluir no site.</summary>
+    public bool ImagemRemovida { get; set; }
 
     public decimal? Custo { get; set; }
     public decimal PrecoVenda { get; set; }

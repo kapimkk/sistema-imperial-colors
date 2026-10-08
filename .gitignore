@@ -84,3 +84,6 @@ TestResults/
 # Generated files
 *.g.cs
 *.generated.cs
+
+# Arquivos importantes do catálogo: backup externo, nunca Git
+ImagensProdutos/

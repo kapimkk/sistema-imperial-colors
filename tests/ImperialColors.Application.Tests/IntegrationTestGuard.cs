@@ -1,41 +1,24 @@
+using Npgsql;
+
 namespace ImperialColors.Application.Tests;
 
-/// <summary>
-/// Evita que testes de integração gravem dados no banco de desenvolvimento
-/// quando RUN_INTEGRATION_TESTS não estiver definido como true.
-/// </summary>
+/// <summary>Integrações exigem opt-in e conexão local explícita. Nunca carrega o .env da loja.</summary>
 internal static class IntegrationTestGuard
 {
     public static bool TryObterConnectionString(out string connectionString)
     {
         connectionString = string.Empty;
-
-        if (!string.Equals(
-                Environment.GetEnvironmentVariable("RUN_INTEGRATION_TESTS"),
-                "true",
-                StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(Environment.GetEnvironmentVariable("RUN_INTEGRATION_TESTS"), "true", StringComparison.OrdinalIgnoreCase))
             return false;
-
+        var valor = Environment.GetEnvironmentVariable("IMPERIAL_TEST_DATABASE_CONNECTION_STRING");
+        if (string.IsNullOrWhiteSpace(valor))
+            return false;
+        var builder = new NpgsqlConnectionStringBuilder(valor);
+        if (builder.Host is not ("localhost" or "127.0.0.1" or "::1")
+            || builder.Database is null || !builder.Database.EndsWith("_test", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Integração exige host loopback e banco com sufixo _test.");
         AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
-
-        var envPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", ".env"));
-        if (!File.Exists(envPath))
-            return false;
-
-        DotNetEnv.Env.Load(envPath);
-
-        var password = Environment.GetEnvironmentVariable("DB_PASSWORD");
-        if (string.IsNullOrWhiteSpace(password))
-            return false;
-
-        var host = Environment.GetEnvironmentVariable("DB_HOST") ?? "localhost";
-        var port = Environment.GetEnvironmentVariable("DB_PORT") ?? "5432";
-        var dbName = Environment.GetEnvironmentVariable("DB_NAME") ?? "imperial_colors";
-        var user = Environment.GetEnvironmentVariable("DB_USER") ?? "postgres";
-        var ssl = Environment.GetEnvironmentVariable("DB_SSL_MODE") ?? "Prefer";
-
-        connectionString =
-            $"Host={host};Port={port};Database={dbName};Username={user};Password={password};SSL Mode={ssl};Trust Server Certificate=true;";
+        connectionString = builder.ConnectionString;
         return true;
     }
 }

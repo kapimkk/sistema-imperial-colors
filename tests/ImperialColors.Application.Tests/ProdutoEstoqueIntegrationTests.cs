@@ -64,8 +64,8 @@ public class ProdutoEstoqueIntegrationTests
             foreach (var nome in nomes)
             {
                 var codigo = await produtoService.GerarProximoCodigoInternoAsync();
-                var criado = await produtoService.CriarAsync(new CriarProdutoDto
-                {
+                var criado = await produtoService.CriarAsync(new CriarProdutoDto {
+                    PesoGramas = 5500, AlturaCm = 25m, LarguraCm = 20m, ComprimentoCm = 30m,
                     CodigoInterno = codigo,
                     Nome = nome,
                     CategoriaId = categoria.Id,

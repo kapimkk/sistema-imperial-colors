@@ -121,3 +121,23 @@ public class LinhaMovimentacaoProdutoResumo
     /// venda.</summary>
     public CanalVenda? Canal { get; set; }
 }
+
+/// <summary>Itens vendidos de uma categoria no período, balcão e venda externa somados.</summary>
+public class CategoriaItensVendidosResumo
+{
+    /// <summary>Nulo quando o item não tem categoria: produto sem categoria cadastrada ou item
+    /// digitado à mão na venda externa, que não tem produto por trás.</summary>
+    public string? Categoria { get; set; }
+    public decimal QuantidadeItens { get; set; }
+}
+
+/// <summary>Produto entre os mais vendidos do período, com quantas vendas distintas o
+/// incluíram — "vendeu 40 unidades" e "apareceu em 12 vendas" contam histórias diferentes
+/// (uma obra grande infla a quantidade e quase não mexe no número de vendas).</summary>
+public class ProdutoMaisVendidoResumo
+{
+    public string CodigoInterno { get; set; } = string.Empty;
+    public string NomeProduto { get; set; } = string.Empty;
+    public decimal QuantidadeVendida { get; set; }
+    public int QuantidadeVendas { get; set; }
+}

@@ -101,8 +101,8 @@ internal sealed class Auditoria2Infra : IAsyncDisposable
 
     public async Task<ProdutoDto> CriarProdutoAsync(int categoriaId, int marcaId, string nome, decimal preco, decimal estoque)
     {
-        var produto = await Servico<IProdutoService>().CriarAsync(new CriarProdutoDto
-        {
+        var produto = await Servico<IProdutoService>().CriarAsync(new CriarProdutoDto {
+                    PesoGramas = 5500, AlturaCm = 25m, LarguraCm = 20m, ComprimentoCm = 30m,
             Nome = nome,
             CodigoInterno = $"AUD2-{Guid.NewGuid():N}"[..20],
             CodigoInternoDefinidoManualmente = true,

@@ -112,6 +112,7 @@ public class ProdutoExclusaoCodigoBarrasTests
 
     private static CriarProdutoDto CriarDtoValido() => new()
     {
+        PesoGramas = 5500, AlturaCm = 25m, LarguraCm = 20m, ComprimentoCm = 30m,
         CodigoInterno = "P00099",
         Nome = "Produto QA",
         CategoriaId = 1,

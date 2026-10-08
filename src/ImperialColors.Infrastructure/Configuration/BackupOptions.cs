@@ -16,6 +16,7 @@ public class BackupOptions
     public string Senha { get; init; } = string.Empty;
     public string? PgDumpPath { get; init; }
 
+    public string RaizImagensProdutos { get; init; } = AppContext.BaseDirectory;
     public string PastaLogos { get; init; } = string.Empty;
     public string CaminhoAppsettings { get; init; } = string.Empty;
 
@@ -36,6 +37,8 @@ public class BackupOptions
             Usuario = ObterEnv("DB_USER", "postgres"),
             Senha = Environment.GetEnvironmentVariable("DB_PASSWORD") ?? string.Empty,
             PgDumpPath = ObterEnvOpcional("PG_DUMP_PATH"),
+            RaizImagensProdutos = Services.ImagemProdutoStorage.ResolverRaiz(baseDir,
+                Environment.GetEnvironmentVariable("PRODUCT_IMAGES_ROOT")),
             PastaLogos = pastaLogos,
             CaminhoAppsettings = appsettings
         };

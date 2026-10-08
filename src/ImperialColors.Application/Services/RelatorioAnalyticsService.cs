@@ -141,6 +141,41 @@ public class RelatorioAnalyticsService : IRelatorioAnalyticsService
         }).ToList();
     }
 
+    public async Task<IReadOnlyList<CategoriaItensVendidosDto>> ObterItensVendidosPorCategoriaAsync(
+        DateTime inicio, DateTime fim, CancellationToken cancellationToken = default)
+    {
+        var linhas = await _repository.ObterItensVendidosPorCategoriaAsync(inicio, fim, cancellationToken);
+        var maior = linhas.Count > 0 ? linhas.Max(l => l.QuantidadeItens) : 0m;
+
+        return linhas
+            .Select(l => new CategoriaItensVendidosDto
+            {
+                // Sem categoria: produto sem categoria cadastrada ou item digitado à mão na
+                // venda externa. Entram na contagem — o total de itens vendidos tem que bater.
+                Categoria = string.IsNullOrWhiteSpace(l.Categoria) ? "Sem categoria" : l.Categoria!,
+                QuantidadeItens = l.QuantidadeItens,
+                PercentualBarra = maior > 0 ? Math.Round(l.QuantidadeItens / maior * 100m, 1) : 0m
+            })
+            .ToList();
+    }
+
+    public async Task<IReadOnlyList<ProdutoMaisVendidoDto>> ObterProdutosMaisVendidosComVendasAsync(
+        DateTime inicio, DateTime fim, int quantidade, CancellationToken cancellationToken = default)
+    {
+        var linhas = await _repository.ObterProdutosMaisVendidosComVendasAsync(inicio, fim, quantidade, cancellationToken);
+
+        return linhas
+            .Select((l, indice) => new ProdutoMaisVendidoDto
+            {
+                Posicao = indice + 1,
+                CodigoInterno = l.CodigoInterno,
+                NomeProduto = l.NomeProduto,
+                QuantidadeVendida = l.QuantidadeVendida,
+                QuantidadeVendas = l.QuantidadeVendas
+            })
+            .ToList();
+    }
+
     public async Task<IReadOnlyList<LinhaMovimentacaoProdutoDto>> ObterMovimentacoesProdutosAsync(
         DateTime inicio, DateTime fim, CancellationToken cancellationToken = default)
     {

@@ -14,6 +14,7 @@ public class DashboardService : IDashboardService
     private const int DiasLimiteValidadeProxima = 15;
     private const int TopEstoque = 10;
     private const int TopDestaques = 5;
+    private static readonly DateTime InicioDoHistorico = new(2000, 1, 1);
 
     private readonly IVendaRepository _vendaRepository;
     private readonly IVendaExternaRepository _vendaExternaRepository;
@@ -189,6 +190,37 @@ public class DashboardService : IDashboardService
             .ToList();
 
         return new DashboardVendasDto { MaioresVendas = maioresVendas };
+    }
+
+    /// <summary>
+    /// Itens por categoria e top 5 de produtos no mês corrente ou no histórico inteiro.
+    ///
+    /// "Total" parte de uma data fixa e antiga em vez de <c>DateTime.MinValue</c>: o Npgsql
+    /// trata MinValue como "-infinity" ao gravar/comparar timestamps, e um limite que o
+    /// provider reinterpreta é o tipo de detalhe que funciona até a versão em que deixa de
+    /// funcionar. O fim é o último instante de hoje — venda não nasce no futuro.
+    /// </summary>
+    public async Task<DashboardProdutosVendidosDto> ObterProdutosVendidosAsync(
+        PeriodoDashboard periodo, CancellationToken cancellationToken = default)
+    {
+        var hoje = Relogio.Hoje;
+        var (inicioMes, fimMesExclusivo) = ObterMesAtual(hoje);
+
+        var (inicio, fim) = periodo == PeriodoDashboard.Total
+            ? (InicioDoHistorico, hoje.AddDays(1).AddTicks(-1))
+            : (inicioMes, fimMesExclusivo.AddTicks(-1));
+
+        var itensPorCategoria = await _relatorioAnalyticsService.ObterItensVendidosPorCategoriaAsync(
+            inicio, fim, cancellationToken);
+        var produtosMaisVendidos = await _relatorioAnalyticsService.ObterProdutosMaisVendidosComVendasAsync(
+            inicio, fim, TopDestaques, cancellationToken);
+
+        return new DashboardProdutosVendidosDto
+        {
+            Periodo = periodo,
+            ItensPorCategoria = itensPorCategoria.ToList(),
+            ProdutosMaisVendidos = produtosMaisVendidos.ToList()
+        };
     }
 
     /// <summary>

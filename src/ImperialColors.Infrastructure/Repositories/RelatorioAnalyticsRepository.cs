@@ -261,6 +261,145 @@ public class RelatorioAnalyticsRepository : IRelatorioAnalyticsRepository
     }
 
     /// <summary>
+    /// Itens vendidos no período agrupados por categoria, somando balcão e venda externa — as
+    /// mesmas duas origens que o faturamento do Dashboard já soma.
+    ///
+    /// Produto e categoria entram sem o filtro global de soft-delete: inativar uma categoria
+    /// hoje não pode fazer as vendas de ontem sumirem da contagem. A categoria é resolvida em
+    /// memória a partir dos ids agregados, para o banco devolver poucas linhas.
+    /// </summary>
+    public async Task<IReadOnlyList<CategoriaItensVendidosResumo>> ObterItensVendidosPorCategoriaAsync(
+        DateTime inicio, DateTime fim, CancellationToken cancellationToken = default)
+    {
+        await using var context = _contextFactory.CreateDbContext();
+
+        var balcao = await (
+            from item in context.ItensVenda.AsNoTracking()
+            join produto in context.Produtos.IgnoreQueryFilters().AsNoTracking()
+                on item.ProdutoId equals produto.Id into correspondentes
+            from produto in correspondentes.DefaultIfEmpty()
+            where item.Venda.Status == StatusVenda.Finalizada &&
+                  item.Venda.DataVenda >= inicio && item.Venda.DataVenda <= fim
+            group item.Quantidade by (produto != null ? produto.CategoriaId : null) into g
+            select new { CategoriaId = g.Key, Quantidade = g.Sum() })
+            .ToListAsync(cancellationToken);
+
+        var externas = await (
+            from item in context.ItensVendaExterna.AsNoTracking()
+            join produto in context.Produtos.IgnoreQueryFilters().AsNoTracking()
+                on item.ProdutoId equals produto.Id into correspondentes
+            from produto in correspondentes.DefaultIfEmpty()
+            where item.VendaExterna.DataVenda >= inicio && item.VendaExterna.DataVenda <= fim
+            group item.Quantidade by (produto != null ? produto.CategoriaId : null) into g
+            select new { CategoriaId = g.Key, Quantidade = g.Sum() })
+            .ToListAsync(cancellationToken);
+
+        var porCategoria = balcao.Concat(externas)
+            .GroupBy(x => x.CategoriaId)
+            .Select(g => new { CategoriaId = g.Key, Quantidade = g.Sum(x => x.Quantidade) })
+            .Where(x => x.Quantidade > 0)
+            .ToList();
+
+        if (porCategoria.Count == 0)
+            return Array.Empty<CategoriaItensVendidosResumo>();
+
+        var ids = porCategoria.Where(x => x.CategoriaId.HasValue).Select(x => x.CategoriaId!.Value).ToList();
+        var nomes = await context.Categorias
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(c => ids.Contains(c.Id))
+            .ToDictionaryAsync(c => c.Id, c => c.Nome, cancellationToken);
+
+        return porCategoria
+            .Select(x => new CategoriaItensVendidosResumo
+            {
+                Categoria = x.CategoriaId.HasValue && nomes.TryGetValue(x.CategoriaId.Value, out var nome) ? nome : null,
+                QuantidadeItens = x.Quantidade
+            })
+            .OrderByDescending(x => x.QuantidadeItens)
+            .ThenBy(x => x.Categoria, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    /// <summary>
+    /// Top de produtos por quantidade vendida, cada um com em quantas vendas distintas
+    /// apareceu. O mesmo produto lançado duas vezes na mesma venda conta como UMA venda —
+    /// por isso o <c>Distinct</c> sobre o id da venda, e não a contagem de itens.
+    ///
+    /// Balcão e venda externa somam por produto; item manual da venda externa não tem produto
+    /// e portanto não entra num ranking de produtos.
+    /// </summary>
+    public async Task<IReadOnlyList<ProdutoMaisVendidoResumo>> ObterProdutosMaisVendidosComVendasAsync(
+        DateTime inicio, DateTime fim, int quantidade, CancellationToken cancellationToken = default)
+    {
+        await using var context = _contextFactory.CreateDbContext();
+
+        var balcao = await context.ItensVenda
+            .AsNoTracking()
+            .Where(i => i.Venda.Status == StatusVenda.Finalizada &&
+                        i.Venda.DataVenda >= inicio && i.Venda.DataVenda <= fim)
+            .GroupBy(i => i.ProdutoId)
+            .Select(g => new
+            {
+                ProdutoId = g.Key,
+                Quantidade = g.Sum(x => x.Quantidade),
+                Vendas = g.Select(x => x.VendaId).Distinct().Count()
+            })
+            .ToListAsync(cancellationToken);
+
+        var externas = await context.ItensVendaExterna
+            .AsNoTracking()
+            .Where(i => i.ProdutoId.HasValue &&
+                        i.VendaExterna.DataVenda >= inicio && i.VendaExterna.DataVenda <= fim)
+            .GroupBy(i => i.ProdutoId!.Value)
+            .Select(g => new
+            {
+                ProdutoId = g.Key,
+                Quantidade = g.Sum(x => x.Quantidade),
+                Vendas = g.Select(x => x.VendaExternaId).Distinct().Count()
+            })
+            .ToListAsync(cancellationToken);
+
+        // Os ids de venda de balcão e de venda externa vêm de tabelas diferentes, então as
+        // contagens de cada origem são somadas — nunca há a mesma venda nas duas.
+        var top = balcao.Concat(externas)
+            .GroupBy(x => x.ProdutoId)
+            .Select(g => new
+            {
+                ProdutoId = g.Key,
+                Quantidade = g.Sum(x => x.Quantidade),
+                Vendas = g.Sum(x => x.Vendas)
+            })
+            .Where(x => x.Quantidade > 0)
+            .OrderByDescending(x => x.Quantidade)
+            .ThenByDescending(x => x.Vendas)
+            .Take(Math.Max(1, quantidade))
+            .ToList();
+
+        if (top.Count == 0)
+            return Array.Empty<ProdutoMaisVendidoResumo>();
+
+        var ids = top.Select(x => x.ProdutoId).ToList();
+        var produtos = await context.Produtos
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(p => ids.Contains(p.Id))
+            .Select(p => new { p.Id, p.CodigoInterno, p.Nome })
+            .ToDictionaryAsync(p => p.Id, cancellationToken);
+
+        return top
+            .Where(x => produtos.ContainsKey(x.ProdutoId))
+            .Select(x => new ProdutoMaisVendidoResumo
+            {
+                CodigoInterno = produtos[x.ProdutoId].CodigoInterno,
+                NomeProduto = produtos[x.ProdutoId].Nome,
+                QuantidadeVendida = x.Quantidade,
+                QuantidadeVendas = x.Vendas
+            })
+            .ToList();
+    }
+
+    /// <summary>
     /// Extrato de entradas e saídas no período. Traz o documento de origem junto para a
     /// linha se explicar sozinha: "saída de 2 un" não diz nada, "saída de 2 un — venda
     /// 20260918-0001, Site" diz.

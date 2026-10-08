@@ -3,12 +3,13 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:conv="clr-namespace:ImperialColors.UI.Converters"
              xmlns:helpers="clr-namespace:ImperialColors.UI.Helpers"
-             xmlns:vm="clr-namespace:ImperialColors.UI.ViewModels">
+             xmlns:vm="clr-namespace:ImperialColors.UI.ViewModels"
+             xmlns:app="clr-namespace:ImperialColors.Application.DTOs;assembly=ImperialColors.Application">
 
     <UserControl.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="/Resources/AppTheme.xaml"/>
+                <ResourceDictionary Source="pack://application:,,,/ImperialColors;component/Resources/AppTheme.xaml"/>
             </ResourceDictionary.MergedDictionaries>
             <conv:MoedaConverter x:Key="MoedaConverter"/>
             <conv:DataConverter x:Key="DataConverter"/>
@@ -349,6 +350,112 @@
 
                 <!-- ===== Visão Vendas ===== -->
                 <StackPanel Visibility="{Binding MostrarVendas, Converter={StaticResource BoolToVisibilityConverter}}">
+
+                    <!-- Seletor de período dos dois blocos abaixo. IsChecked em Mode=OneWay pelo
+                         mesmo motivo do seletor de visão: o ViewModel decide quem está marcado. -->
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,0,12">
+                        <TextBlock Text="Período:" FontSize="12" VerticalAlignment="Center" Margin="0,0,10,0"
+                                   Foreground="{StaticResource CinzaTextoBrush}"/>
+                        <ToggleButton x:Name="BtnPeriodoMes" Content="Mês" Style="{StaticResource TogglePagamento}" Margin="0,0,8,0"
+                                      IsChecked="{Binding PeriodoEhMes, Mode=OneWay}"
+                                      Command="{Binding TrocarPeriodoProdutosCommand}" CommandParameter="{x:Static app:PeriodoDashboard.Mes}"/>
+                        <ToggleButton x:Name="BtnPeriodoTotal" Content="Total" Style="{StaticResource TogglePagamento}"
+                                      IsChecked="{Binding PeriodoEhTotal, Mode=OneWay}"
+                                      Command="{Binding TrocarPeriodoProdutosCommand}" CommandParameter="{x:Static app:PeriodoDashboard.Total}"/>
+                    </StackPanel>
+
+                    <Grid Margin="0,0,0,24">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="20"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <Border Grid.Column="0" Style="{StaticResource Card}" Padding="22,18">
+                            <StackPanel>
+                                <TextBlock Text="{Binding TituloItensPorCategoria}" FontSize="15" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                                <TextBlock Text="Balcão e vendas externas, em unidades" FontSize="11" Margin="0,0,0,14"
+                                           Foreground="{StaticResource CinzaTextoBrush}"/>
+
+                                <TextBlock Text="{Binding MensagemSemItensVendidos}" FontSize="12"
+                                           Foreground="{StaticResource CinzaTextoBrush}"
+                                           Visibility="{Binding SemItensVendidosNoMes, Converter={StaticResource BoolToVisibilityConverter}}"/>
+
+                                <ItemsControl ItemsSource="{Binding ItensPorCategoria}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="0,0,0,10">
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="Auto"/>
+                                                    <RowDefinition Height="Auto"/>
+                                                </Grid.RowDefinitions>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Row="0" Grid.Column="0" Text="{Binding Categoria}" FontSize="12"
+                                                           TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding QuantidadeItens, StringFormat={}{0:0.###}}"
+                                                           FontSize="12" FontWeight="SemiBold" Margin="12,0,0,0"/>
+                                                <!-- Largura fixa da trilha (como nas barras do lucro): a barra proporcional
+                                                     usa a mesma medida, então a maior categoria sempre fecha a trilha. -->
+                                                <Border Grid.Row="1" Grid.ColumnSpan="2" Height="6" Width="300" CornerRadius="3" Margin="0,4,0,0"
+                                                        HorizontalAlignment="Left" Background="{StaticResource CinzaClaroBrush}">
+                                                    <Border CornerRadius="3" HorizontalAlignment="Left"
+                                                            Background="{StaticResource AmareloPrimarioBrush}"
+                                                            Width="{Binding PercentualBarra, Converter={StaticResource PercentualParaLarguraConverter}, ConverterParameter=300}"/>
+                                                </Border>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Grid.Column="2" Style="{StaticResource Card}" Padding="22,18">
+                            <StackPanel>
+                                <TextBlock Text="{Binding TituloMaisVendidos}" FontSize="15" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                                <TextBlock Text="Unidades vendidas e em quantas vendas apareceu" FontSize="11" Margin="0,0,0,14"
+                                           Foreground="{StaticResource CinzaTextoBrush}"/>
+
+                                <TextBlock Text="{Binding MensagemSemItensVendidos}" FontSize="12"
+                                           Foreground="{StaticResource CinzaTextoBrush}"
+                                           Visibility="{Binding SemItensVendidosNoMes, Converter={StaticResource BoolToVisibilityConverter}}"/>
+
+                                <ItemsControl ItemsSource="{Binding ProdutosMaisVendidosMes}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Padding="12,10" Margin="0,0,0,6" Background="{StaticResource CinzaClaroBrush}" CornerRadius="6">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="28"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Grid.Column="0" Text="{Binding Posicao}" FontSize="12" FontWeight="Bold"
+                                                               Foreground="{StaticResource AmareloPrimarioBrush}" VerticalAlignment="Center"/>
+                                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding NomeProduto}" FontSize="12" TextTrimming="CharacterEllipsis"/>
+                                                        <TextBlock Text="{Binding CodigoInterno}" FontSize="10"
+                                                                   Foreground="{StaticResource CinzaTextoBrush}"/>
+                                                    </StackPanel>
+                                                    <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="12,0,0,0">
+                                                        <TextBlock FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Right">
+                                                            <Run Text="{Binding QuantidadeVendida, StringFormat={}{0:0.###}, Mode=OneWay}"/><Run Text=" un."/>
+                                                        </TextBlock>
+                                                        <TextBlock FontSize="10" HorizontalAlignment="Right"
+                                                                   Foreground="{StaticResource CinzaTextoBrush}">
+                                                            <Run Text="{Binding QuantidadeVendas, Mode=OneWay}"/><Run Text=" venda(s)"/>
+                                                        </TextBlock>
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
 
                     <Border Style="{StaticResource Card}" Padding="22,18">
                         <StackPanel>

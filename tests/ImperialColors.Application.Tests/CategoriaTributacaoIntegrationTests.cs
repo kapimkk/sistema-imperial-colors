@@ -75,8 +75,8 @@ public class CategoriaTributacaoIntegrationTests
         Assert.Equal(1.65m, recuperado.AliquotaPis);
 
         // Simula o que a tela faz ao herdar o padrão da categoria para um produto novo.
-        var produto = await produtoService.CriarAsync(new CriarProdutoDto
-        {
+        var produto = await produtoService.CriarAsync(new CriarProdutoDto {
+                    PesoGramas = 5500, AlturaCm = 25m, LarguraCm = 20m, ComprimentoCm = 30m,
             CodigoInterno = await produtoService.GerarProximoCodigoInternoAsync(),
             Nome = $"ProdutoHerdaTributacao{sufixo}",
             CategoriaId = categoria.Id,

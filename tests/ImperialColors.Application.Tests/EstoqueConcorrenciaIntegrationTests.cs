@@ -60,8 +60,8 @@ public class EstoqueConcorrenciaIntegrationTests
         var marca = await marcaRepo.AdicionarAsync(new Marca { Nome = $"MarcaConcorrencia{sufixo}", Ativo = true });
 
         var codigo = await produtoService.GerarProximoCodigoInternoAsync();
-        var produto = await produtoService.CriarAsync(new CriarProdutoDto
-        {
+        var produto = await produtoService.CriarAsync(new CriarProdutoDto {
+                    PesoGramas = 5500, AlturaCm = 25m, LarguraCm = 20m, ComprimentoCm = 30m,
             CodigoInterno = codigo,
             Nome = $"ProdutoConcorrencia{sufixo}",
             CategoriaId = categoria.Id,
@@ -167,8 +167,8 @@ public class EstoqueConcorrenciaIntegrationTests
         var categoria = await categoriaRepo.AdicionarAsync(new Categoria { Nome = $"CatEdicao{sufixo}", Ativo = true });
         var marca = await marcaRepo.AdicionarAsync(new Marca { Nome = $"MarcaEdicao{sufixo}", Ativo = true });
 
-        var produto = await produtoService.CriarAsync(new CriarProdutoDto
-        {
+        var produto = await produtoService.CriarAsync(new CriarProdutoDto {
+                    PesoGramas = 5500, AlturaCm = 25m, LarguraCm = 20m, ComprimentoCm = 30m,
             CodigoInterno = await produtoService.GerarProximoCodigoInternoAsync(),
             Nome = $"ProdutoEdicao{sufixo}",
             CategoriaId = categoria.Id,

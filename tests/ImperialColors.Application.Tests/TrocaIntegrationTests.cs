@@ -101,8 +101,8 @@ public class TrocaIntegrationTests
         try
         {
             // --- Teste 1: Galão 18L ---
-            var galao18L = await produtoService.CriarAsync(new CriarProdutoDto
-            {
+            var galao18L = await produtoService.CriarAsync(new CriarProdutoDto {
+                    PesoGramas = 5500, AlturaCm = 25m, LarguraCm = 20m, ComprimentoCm = 30m,
                 Nome = $"Tinta Coral GL18L {sufixo}",
                 CodigoInterno = $"GL18-{sufixo}",
                 CodigoInternoDefinidoManualmente = true,
@@ -130,8 +130,8 @@ public class TrocaIntegrationTests
             Assert.Equal("18L", prodBanco.TamanhoEmbalagem);
 
             // --- Teste 2: Balde BD ---
-            var balde = await produtoService.CriarAsync(new CriarProdutoDto
-            {
+            var balde = await produtoService.CriarAsync(new CriarProdutoDto {
+                    PesoGramas = 5500, AlturaCm = 25m, LarguraCm = 20m, ComprimentoCm = 30m,
                 Nome = $"Tinta Balde BD {sufixo}",
                 CodigoInterno = $"BD-{sufixo}",
                 CodigoInternoDefinidoManualmente = true,
@@ -185,8 +185,8 @@ public class TrocaIntegrationTests
         try
         {
             // Produto devolvido: R$100 com 5 em estoque
-            var prodDevolvido = await produtoService.CriarAsync(new CriarProdutoDto
-            {
+            var prodDevolvido = await produtoService.CriarAsync(new CriarProdutoDto {
+                    PesoGramas = 5500, AlturaCm = 25m, LarguraCm = 20m, ComprimentoCm = 30m,
                 Nome = $"Tinta A {sufixo}",
                 CodigoInterno = $"PA-{sufixo}",
                 CodigoInternoDefinidoManualmente = true,
@@ -202,8 +202,8 @@ public class TrocaIntegrationTests
             produtoIds.Add(prodDevolvido.Id);
 
             // Produto novo: R$150 com 10 em estoque
-            var prodNovo = await produtoService.CriarAsync(new CriarProdutoDto
-            {
+            var prodNovo = await produtoService.CriarAsync(new CriarProdutoDto {
+                    PesoGramas = 5500, AlturaCm = 25m, LarguraCm = 20m, ComprimentoCm = 30m,
                 Nome = $"Tinta B {sufixo}",
                 CodigoInterno = $"PB-{sufixo}",
                 CodigoInternoDefinidoManualmente = true,

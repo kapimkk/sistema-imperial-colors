@@ -92,6 +92,7 @@ public class ProdutoServiceCodigoInternoTests
 
     private static CriarProdutoDto CriarDtoValido(string codigo, bool codigoManual) => new()
     {
+        PesoGramas = 5500, AlturaCm = 25m, LarguraCm = 20m, ComprimentoCm = 30m,
         CodigoInterno = codigo,
         CodigoInternoDefinidoManualmente = codigoManual,
         Nome = "Produto Teste",

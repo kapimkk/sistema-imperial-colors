@@ -364,8 +364,8 @@ public class Auditoria2VendaTrocaTests
             await using var scope = infra.Provider.CreateAsyncScope();
             try
             {
-                var produto = await scope.ServiceProvider.GetRequiredService<IProdutoService>().CriarAsync(new CriarProdutoDto
-                {
+                var produto = await scope.ServiceProvider.GetRequiredService<IProdutoService>().CriarAsync(new CriarProdutoDto {
+                    PesoGramas = 5500, AlturaCm = 25m, LarguraCm = 20m, ComprimentoCm = 30m,
                     Nome = $"Aud2 Concorrente {n} {sufixo}",
                     CodigoInterno = codigo,
                     CodigoInternoDefinidoManualmente = false,

@@ -59,8 +59,8 @@ public class VendaExternaIntegrationTests
 
         var sufixo = Guid.NewGuid().ToString("N")[..8];
         var (categoriaId, marcaId) = await CriarCategoriaEMarcaAsync(scope.ServiceProvider, sufixo);
-        var produto = await produtoService.CriarAsync(new CriarProdutoDto
-        {
+        var produto = await produtoService.CriarAsync(new CriarProdutoDto {
+                    PesoGramas = 5500, AlturaCm = 25m, LarguraCm = 20m, ComprimentoCm = 30m,
             Nome = $"Tinta Externa {sufixo}",
             CodigoInterno = $"EXT-{sufixo}",
             CodigoInternoDefinidoManualmente = true,
@@ -125,8 +125,8 @@ public class VendaExternaIntegrationTests
 
         var sufixo = Guid.NewGuid().ToString("N")[..8];
         var (categoriaId, marcaId) = await CriarCategoriaEMarcaAsync(scope.ServiceProvider, sufixo);
-        var produto = await produtoService.CriarAsync(new CriarProdutoDto
-        {
+        var produto = await produtoService.CriarAsync(new CriarProdutoDto {
+                    PesoGramas = 5500, AlturaCm = 25m, LarguraCm = 20m, ComprimentoCm = 30m,
             Nome = $"Produto Rollback {sufixo}",
             CodigoInterno = $"RB-{sufixo}",
             CodigoInternoDefinidoManualmente = true,
@@ -174,8 +174,8 @@ public class VendaExternaIntegrationTests
 
         var sufixo = Guid.NewGuid().ToString("N")[..8];
         var (categoriaId, marcaId) = await CriarCategoriaEMarcaAsync(scope.ServiceProvider, sufixo);
-        var produto = await produtoService.CriarAsync(new CriarProdutoDto
-        {
+        var produto = await produtoService.CriarAsync(new CriarProdutoDto {
+                    PesoGramas = 5500, AlturaCm = 25m, LarguraCm = 20m, ComprimentoCm = 30m,
             Nome = $"Galão Externo {sufixo}",
             CodigoInterno = $"GAL-{sufixo}",
             CodigoInternoDefinidoManualmente = true,
@@ -243,8 +243,8 @@ public class VendaExternaIntegrationTests
 
         var sufixo = Guid.NewGuid().ToString("N")[..8];
         var (categoriaId, marcaId) = await CriarCategoriaEMarcaAsync(scope.ServiceProvider, sufixo);
-        var produto = await produtoService.CriarAsync(new CriarProdutoDto
-        {
+        var produto = await produtoService.CriarAsync(new CriarProdutoDto {
+                    PesoGramas = 5500, AlturaCm = 25m, LarguraCm = 20m, ComprimentoCm = 30m,
             Nome = $"Prod Exclusão {sufixo}",
             CodigoInterno = $"DEL-{sufixo}",
             CodigoInternoDefinidoManualmente = true,

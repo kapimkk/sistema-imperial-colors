@@ -80,7 +80,7 @@ DB_PASSWORD=SuaSenha
 DB_SSL_MODE=Prefer
 
 ADMIN_USERNAME=admin
-ADMIN_PASSWORD=Admin@1234
+ADMIN_PASSWORD=<SENHA_ADMIN_FORTE>
 ADMIN_EMAIL=admin@imperialcolors.local
 ```
 
@@ -136,7 +136,7 @@ Na primeira execução, o sistema cria (ou garante) o usuário admin definido no
 | Campo | Valor padrão |
 |---|---|
 | Usuário | `admin` |
-| Senha | `Admin@1234` |
+| Senha | `<SENHA_ADMIN_FORTE>` |
 
 ### Cadastro de novos usuários
 
@@ -605,6 +605,11 @@ Se o IP do servidor mudar, atualiza-se **só o `hosts` do servidor** (ou a reser
 - Top 3 produtos mais vendidos
 - Resumo financeiro e últimas vendas
 - **Balcão e vendas externas somados:** faturamento, custo, lucro, margem, ticket médio, quantidade de vendas, o gráfico dos últimos 7 dias e os destaques de "Maiores Vendas do Mês" contam as duas origens — os mesmos números do Relatório Consolidado de Vendas. Venda externa não registra cliente nem forma de pagamento, então aparece nos destaques identificada pelo número, com o pagamento em branco
+- **Aba Vendas — itens por categoria e top 5:** além das "Maiores Vendas do Mês", a aba mostra (balcão e vendas externas somados):
+  - **Seletor Mês / Total** (canto superior direito dos dois blocos, começa em *Mês*): *Mês* conta o mês corrente; *Total* conta todo o histórico até hoje. Trocar recarrega só estes dois blocos — as "Maiores Vendas" continuam sendo do mês — e os títulos acompanham ("… (mês)" / "… (total)")
+  - **Itens Vendidos por Categoria** — unidades vendidas por categoria, da que mais saiu para a que menos saiu, com barra proporcional. Produto sem categoria e item digitado à mão na venda externa entram como "Sem categoria", para o total de itens bater
+  - **5 Mais Vendidos** — os cinco produtos que mais saíram, com as **unidades vendidas** e em **quantas vendas** apareceu (o mesmo produto lançado duas vezes na mesma venda conta como uma venda só). Item manual não entra: não tem produto por trás
+  - Venda cancelada fica fora; produto ou categoria inativados depois **continuam contando** nas vendas que já fizeram
 - **Visão Comissões** — quanto a loja ainda deve aos vendedores de rua, quanto já pagou, o total de comissões do mês e a lista das pendentes. O acerto em si é feito em **Vendas externas → Comissões**
 
 ### Estoque
@@ -781,6 +786,8 @@ Se o IP do servidor mudar, atualiza-se **só o `hosts` do servidor** (ou a reser
 - Produtos sem estoque
 
 ### Backup Automático Híbrido
+
+**Catálogo:** o backup agora inclui `ImagensProdutos/` e manifesto SHA-256 junto ao banco, com bloqueio compartilhado durante a cópia. Em multi-PC configure a mesma `PRODUCT_IMAGES_ROOT` em todos os PCs e no Sync. Veja [pasta compartilhada e restauração](docs/CATALOGO_FRETE_IMAGENS_SYNC.md#instalações-em-vários-computadores).
 - Disparo silencioso na abertura da `MainWindow` (após login), em `Task.Run` — **não bloqueia** login, menu ou PDV
 - Verifica `DataUltimoBackup` na tabela PostgreSQL `parametros_sistema` (chave `DataUltimoBackup`)
 - Executa backup se nunca rodou ou se passaram **≥ 7 dias** (`BACKUP_INTERVALO_DIAS` no `.env`)
@@ -790,6 +797,8 @@ Se o IP do servidor mudar, atualiza-se **só o `hosts` do servidor** (ou a reser
   - `backup_imperial_dd_MM_yyyy.sql` — o mesmo banco em script SQL de texto, legível no Bloco de Notas
   - `appsettings.json` — configurações locais
   - `logos_empresa\` — pasta de ícones/logos da interface e cupons
+  - `ImagensProdutos\` — imagens reais do catálogo, usando a raiz compartilhada quando configurada
+  - `imagens_produtos_manifest.json` — referências relativas, tamanhos e hashes SHA-256
 - **Os dois arquivos do banco são o mesmo instante:** o `pg_dump` lê o banco uma vez só e gera o `.dump`; o `.sql` é convertido a partir dele pelo `pg_restore`, sem nova leitura. Essa conversão também prova que o `.dump` está legível no dia em que foi gerado. O `pg_restore` usado é o da mesma pasta do `pg_dump`
 - Para restaurar:
 
@@ -807,7 +816,7 @@ Se o IP do servidor mudar, atualiza-se **só o `hosts` do servidor** (ou a reser
 
   O banco de destino precisa existir e estar **vazio** (`createdb`) — restaurar por cima do banco em uso duplica ou conflita com os dados atuais
 - Em caso de falha: log silencioso em `C:\backup_sistema\backup_erros.log`; tenta novamente na próxima abertura
-- Variáveis `.env`: `BACKUP_PATH`, `BACKUP_INTERVALO_DIAS`, `BACKUP_PREFIXO_EMPRESA`, `PG_DUMP_PATH` (opcional)
+- Variáveis `.env`: `BACKUP_PATH`, `BACKUP_INTERVALO_DIAS`, `BACKUP_PREFIXO_EMPRESA`, `PG_DUMP_PATH` (opcional), `PRODUCT_IMAGES_ROOT` (obrigatória nas instalações multi-PC).
 
 ### Atualização do Sistema
 - Botão **⭳ Atualizar Sistema** em **Configurações → Sobre o Sistema**: consulta a última Release publicada no GitHub, compara com a versão do próprio executável, baixa o `ImperialColors-win-x64.zip` anexado e troca os arquivos
@@ -871,6 +880,8 @@ O sistema utiliza tema centralizado em `Resources/AppTheme.xaml`:
 ## Guia de Testes
 
 ### Cadastro de produtos
+
+O cadastro agora inclui descrição, peso/dimensões e imagem principal para o site. Consulte [Frete, imagens e integração do catálogo](docs/CATALOGO_FRETE_IMAGENS_SYNC.md) para unidades, migration aditiva, backup de ImagensProdutos e funcionamento em vários PCs.
 1. Acesse **Estoque** no menu lateral
 2. Clique em **+ Novo Produto**
 3. O código interno é gerado automaticamente (ou clique em "Gerar")
@@ -987,7 +998,7 @@ dotnet ef migrations remove --project src/ImperialColors.Infrastructure --startu
 
 | Tabela | Descrição |
 |---|---|
-| `produtos` | Cadastro de produtos (coluna `litragem_gl` para Galão 3,6L/18L) |
+| produtos | Cadastro, embalagem livre, peso_gramas, dimensões em cm, observacoes e referência relativa de imagem |
 | `categorias` | Categorias de produtos |
 | `marcas` | Marcas de produtos |
 | `movimentacoes_estoque` | Histórico de movimentações |
@@ -1008,7 +1019,7 @@ dotnet ef migrations remove --project src/ImperialColors.Infrastructure --startu
 
 ### Não consigo entrar / "aguardando aprovação"
 
-1. Use o usuário **`admin`** com senha **`Admin@1234`** (conforme `.env`)
+1. Use o usuário **`admin`** com senha **`<SENHA_ADMIN_FORTE>`** (conforme `.env`)
 2. O campo de login aceita **usuário ou e-mail**
 3. Se alterou o banco manualmente, confirme `status = 2` (número, não texto)
 4. Alterar só o status **não muda a senha** — use a senha definida no cadastro
@@ -1023,7 +1034,7 @@ dotnet build
 dotnet run --project src/ImperialColors.UI
 ```
 
-Credenciais padrão: `admin` / `Admin@1234`
+Credenciais padrão: `admin` / `<SENHA_ADMIN_FORTE>`
 
 ### Executar testes de autenticação
 

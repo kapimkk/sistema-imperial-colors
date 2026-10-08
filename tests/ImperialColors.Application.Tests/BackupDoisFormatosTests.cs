@@ -49,10 +49,11 @@ public class BackupDoisFormatosTests : IDisposable
     [Fact]
     public async Task BackupCompleto_GeraDumpComprimidoESqlConvertidoDele()
     {
-        if (!IntegrationTestGuard.TryObterConnectionString(out _))
+        if (!IntegrationTestGuard.TryObterConnectionString(out var conexaoTeste))
             return;
 
-        // O guard carrega o .env nas variáveis de ambiente — as mesmas que o app lê.
+        // Somente conexão local explícita validada pelo guard; nunca usa .env da instalação.
+        var bancoTeste = new Npgsql.NpgsqlConnectionStringBuilder(conexaoTeste);
         var pgDump = PgDumpExecutor.LocalizarPgDump(Environment.GetEnvironmentVariable("PG_DUMP_PATH"));
         if (pgDump is null)
             return; // sem PostgreSQL instalado nesta máquina, não há o que testar
@@ -67,11 +68,11 @@ public class BackupDoisFormatosTests : IDisposable
         {
             DiretorioRaiz = destino,
             PrefixoEmpresa = "teste",
-            Host = Environment.GetEnvironmentVariable("DB_HOST") ?? "localhost",
-            Porta = Environment.GetEnvironmentVariable("DB_PORT") ?? "5432",
-            Banco = Environment.GetEnvironmentVariable("DB_NAME") ?? "imperial_colors",
-            Usuario = Environment.GetEnvironmentVariable("DB_USER") ?? "postgres",
-            Senha = Environment.GetEnvironmentVariable("DB_PASSWORD") ?? string.Empty,
+            Host = bancoTeste.Host,
+            Porta = bancoTeste.Port.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            Banco = bancoTeste.Database!,
+            Usuario = bancoTeste.Username!,
+            Senha = bancoTeste.Password!,
             PgDumpPath = pgDump,
             PastaLogos = pastaLogos,
             CaminhoAppsettings = appsettings
