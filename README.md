@@ -615,6 +615,7 @@ Se o IP do servidor mudar, atualiza-se **só o `hosts` do servidor** (ou a reser
 ### Estoque
 - Cadastro completo de produtos (código interno, código de barras, categoria, marca, etc.)
 - **Filtro "Apenas em Promoção"** — checkbox na listagem que exibe somente produtos com preço promocional ativo e menor que o preço de venda
+- **Lista de estoque com colunas separadas de Quantidade e Unidade** — a quantidade (ex.: `3,6`, `1.234,5`) fica alinhada à direita, ordena como número e carrega a cor de alerta (laranja = estoque baixo, vermelho = zerado); a unidade (`UN`, `GL`, `LT`, `BD`...) vem em coluna própria, na sigla do cadastro. Antes era uma coluna só ("3,6 Litros"), que ordenava como texto
 - Controle de movimentações (entrada, saída, ajuste)
 - Alertas de estoque baixo
 - Busca por nome, código interno ou código de barras

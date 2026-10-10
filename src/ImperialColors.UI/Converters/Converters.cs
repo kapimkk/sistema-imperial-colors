@@ -120,6 +120,19 @@ public class QuantidadeUnidadeConverter : IMultiValueConverter
         => throw new NotImplementedException();
 }
 
+/// <summary>Sigla da unidade de medida como cadastrada (UN, GL, LT...). Produto sem unidade
+/// informada aparece como UN, o mesmo padrão do cadastro.</summary>
+public class UnidadeMedidaConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        => string.IsNullOrWhiteSpace(value?.ToString())
+            ? "UN"
+            : value!.ToString()!.Trim().ToUpperInvariant();
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        => throw new NotImplementedException();
+}
+
 public class EstoqueStatusColorConverter : IValueConverter
 {
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)

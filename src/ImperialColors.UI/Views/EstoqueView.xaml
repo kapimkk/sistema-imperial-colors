@@ -7,9 +7,11 @@
     <UserControl.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="/Resources/AppTheme.xaml"/>
+                <ResourceDictionary Source="pack://application:,,,/ImperialColors;component/Resources/AppTheme.xaml"/>
             </ResourceDictionary.MergedDictionaries>
             <conv:MoedaConverter x:Key="MoedaConverter"/>
+            <conv:QuantidadeConverter x:Key="QuantidadeConverter"/>
+            <conv:UnidadeMedidaConverter x:Key="UnidadeMedidaConverter"/>
             <conv:BoolToVisibilityConverter x:Key="BoolToVisibility"/>
             <conv:InvertBoolToVisibilityConverter x:Key="InvertBoolToVisibility"/>
             <conv:InverseBoolConverter x:Key="InverseBool"/>
@@ -93,15 +95,17 @@
                     <DataGridTextColumn Header="Nome" Binding="{Binding Nome}" Width="*"/>
                     <DataGridTextColumn Header="Categoria" Binding="{Binding CategoriaNome}" Width="120"/>
                     <DataGridTextColumn Header="Marca" Binding="{Binding MarcaNome}" Width="100"/>
-                    <DataGridTextColumn Header="Estoque" Width="130">
-                        <DataGridTextColumn.Binding>
-                            <MultiBinding Converter="{StaticResource QuantidadeUnidadeConverter}">
-                                <Binding Path="QuantidadeEstoque"/>
-                                <Binding Path="Unidade"/>
-                            </MultiBinding>
-                        </DataGridTextColumn.Binding>
+                    <!-- Quantidade e unidade em colunas separadas: a quantidade lê e ordena como número
+                         (SortMemberPath no valor, não no texto formatado) e a unidade filtra o olho
+                         para "o que está em litros / galões". As cores de estoque baixo e zerado
+                         ficam na quantidade, onde o olho procura. -->
+                    <DataGridTextColumn Header="Quantidade" Width="110"
+                                        Binding="{Binding QuantidadeEstoque, Converter={StaticResource QuantidadeConverter}}"
+                                        SortMemberPath="QuantidadeEstoque">
                         <DataGridTextColumn.ElementStyle>
                             <Style TargetType="TextBlock">
+                                <Setter Property="TextAlignment" Value="Right"/>
+                                <Setter Property="Padding" Value="0,0,12,0"/>
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding SemEstoque}" Value="True">
                                         <Setter Property="Foreground" Value="#DC3545"/>
@@ -115,6 +119,9 @@
                             </Style>
                         </DataGridTextColumn.ElementStyle>
                     </DataGridTextColumn>
+                    <DataGridTextColumn Header="Unidade" Width="80"
+                                        Binding="{Binding Unidade, Converter={StaticResource UnidadeMedidaConverter}}"
+                                        SortMemberPath="Unidade"/>
                     <DataGridTextColumn Header="Custo"
                                         Binding="{Binding Custo, Converter={StaticResource MoedaConverter}}"
                                         Width="100"/>
