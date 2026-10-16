@@ -101,6 +101,16 @@ public class ProdutoRepository : RepositoryBase<Produto>, IProdutoRepository
             // QuantidadeEstoque do UPDATE — essa coluna é ajustada abaixo, de forma
             // atômica, pelo delta pretendido pelo usuário (não por um valor absoluto
             // obsoleto que estava em memória quando a tela de edição foi aberta).
+            // As navegações vindas de ObterPorIdAsync (Categoria, Marca, Fornecedor) apontam para
+            // os registros ANTIGOS. Com elas preenchidas, o Update segue a navegação e desfaz a
+            // troca do id: o operador mudava o produto de REVESTIMENTO para TINTA, a tela dizia
+            // que salvou, e o banco continuava em REVESTIMENTO. Zeradas, quem manda é o id.
+            // (Carregadas de novo mais abaixo, já pelo id novo, para o retorno descrever o
+            // produto como ele ficou.)
+            produto.Categoria = null;
+            produto.Marca = null;
+            produto.Fornecedor = null;
+
             context.Set<Produto>().Update(produto);
             context.Entry(produto).Property(p => p.QuantidadeEstoque).IsModified = false;
             // Uma edição aberta antes de outra troca de imagem não pode restaurar referência antiga.
@@ -161,6 +171,11 @@ public class ProdutoRepository : RepositoryBase<Produto>, IProdutoRepository
                 produto.ImagemProdutoPath = imagemAtual.ImagemProdutoPath;
                 produto.ImagemRemovida = imagemAtual.ImagemRemovida;
             }
+
+            // Devolve o produto com as navegações do que está gravado agora, pelo id novo.
+            await context.Entry(produto).Reference(p => p.Categoria).LoadAsync(cancellationToken);
+            await context.Entry(produto).Reference(p => p.Marca).LoadAsync(cancellationToken);
+            await context.Entry(produto).Reference(p => p.Fornecedor).LoadAsync(cancellationToken);
             return produto;
         }, cancellationToken);
     }
