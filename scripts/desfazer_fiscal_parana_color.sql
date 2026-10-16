@@ -2,8 +2,9 @@
 -- desfazer_fiscal_parana_color.sql
 --
 -- Volta os produtos ao estado em que estavam ANTES do
--- atualizar_fiscal_parana_color.sql, usando a tabela de copia de
--- seguranca que aquela execucao criou (bkp_trib_parana_color_...).
+-- atualizar_fiscal_parana_color.sql OU do corrigir_fiscal_parana_color.sql,
+-- usando a tabela de copia de seguranca que aquela execucao criou
+-- (bkp_trib_parana_color_... ou bkp_trib_corrigir_parana_color_...).
 --
 --   * Produto que NAO tinha linha fiscal: a linha criada e apagada.
 --   * Produto que tinha: origem, CFOPs, CSOSN, CST do ICMS, CST do PIS e
