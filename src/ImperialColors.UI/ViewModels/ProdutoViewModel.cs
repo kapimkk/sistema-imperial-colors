@@ -2,7 +2,10 @@ using ImperialColors.Application.DTOs;
 
 using ImperialColors.Application.Interfaces;
 
+using ImperialColors.Domain.Constants;
 using ImperialColors.UI.Helpers;
+using ImperialColors.UI.Services;
+using System.ComponentModel;
 
 using Microsoft.Extensions.DependencyInjection;
 
@@ -107,6 +110,123 @@ public class ProdutoViewModel : BaseViewModel
 
 
 
+    // ---------- Filtro por unidade de medida ----------
+
+    private readonly IFiltroUnidadeEstoqueStore? _filtroUnidadeStore;
+
+    // Ligado enquanto o "Limpar filtro" desmarca várias opções de uma vez: sem isso cada uma
+    // dispararia uma busca e uma gravação, e a tela piscaria entre resultados intermediários.
+    private bool _aplicandoFiltroUnidade;
+
+    /// <summary>Todas as unidades de medida cadastráveis, marcadas ou não.</summary>
+    public ObservableCollection<OpcaoUnidadeFiltro> OpcoesUnidade { get; } = new();
+
+    /// <summary>Siglas marcadas. Vazio = sem filtro, lista inteira.</summary>
+    public IReadOnlyList<string> UnidadesFiltradas
+        => OpcoesUnidade.Where(o => o.Selecionada).Select(o => o.Sigla).ToList();
+
+    public bool FiltroUnidadeAtivo => OpcoesUnidade.Any(o => o.Selecionada);
+
+    /// <summary>Texto do botão: deixa à vista que há filtro ligado, porque ele persiste e
+    /// ninguém pode esquecer por que metade do estoque sumiu da lista.</summary>
+    public string TextoFiltroUnidade
+    {
+        get
+        {
+            var marcadas = UnidadesFiltradas;
+            return marcadas.Count switch
+            {
+                0 => "Unidade",
+                <= 3 => $"Unidade: {string.Join(", ", marcadas)}",
+                _ => $"Unidade: {marcadas.Count} selecionadas"
+            };
+        }
+    }
+
+    /// <summary>"140 produtos cadastrados" não vale com filtro ligado: o número passa a ser o do
+    /// que o filtro deixa passar, e o texto diz isso.</summary>
+    public string ResumoTotalProdutos
+    {
+        get
+        {
+            if (!FiltroUnidadeAtivo)
+                return $"{TotalProdutos} produtos cadastrados";
+
+            var marcadas = UnidadesFiltradas;
+            return marcadas.Count == 1
+                ? $"{TotalProdutos} produtos na unidade {marcadas[0]}"
+                : $"{TotalProdutos} produtos nas unidades {string.Join(", ", marcadas)}";
+        }
+    }
+
+    private bool _filtroUnidadeAberto;
+
+    public bool FiltroUnidadeAberto
+    {
+        get => _filtroUnidadeAberto;
+        set => SetPropertyIfChanged(ref _filtroUnidadeAberto, value);
+    }
+
+    private string _avisoFiltroUnidade = string.Empty;
+
+    /// <summary>Aviso quando a leitura de um código de barras achou o produto, mas ele é de
+    /// uma unidade fora do filtro — sem isso a lista ficaria vazia e pareceria "não achou".</summary>
+    public string AvisoFiltroUnidade
+    {
+        get => _avisoFiltroUnidade;
+        private set
+        {
+            if (SetPropertyIfChanged(ref _avisoFiltroUnidade, value))
+                OnPropertyChanged(nameof(TemAvisoFiltroUnidade));
+        }
+    }
+
+    public bool TemAvisoFiltroUnidade => !string.IsNullOrEmpty(AvisoFiltroUnidade);
+
+    public RelayCommand LimparFiltroUnidadeCommand { get; }
+
+    private void OpcaoUnidade_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (_aplicandoFiltroUnidade || e.PropertyName != nameof(OpcaoUnidadeFiltro.Selecionada))
+            return;
+
+        AplicarFiltroUnidade();
+    }
+
+    private void LimparFiltroUnidade()
+    {
+        _aplicandoFiltroUnidade = true;
+        try
+        {
+            foreach (var opcao in OpcoesUnidade)
+                opcao.Selecionada = false;
+        }
+        finally
+        {
+            _aplicandoFiltroUnidade = false;
+        }
+
+        FiltroUnidadeAberto = false;
+        AplicarFiltroUnidade();
+    }
+
+    /// <summary>Filtro mudou: guarda, avisa a tela e refaz a busca desde a primeira página (a
+    /// página 3 de "todas" não tem relação com a página 3 de "só BD").</summary>
+    private void AplicarFiltroUnidade()
+    {
+        OnPropertyChanged(nameof(UnidadesFiltradas));
+        OnPropertyChanged(nameof(FiltroUnidadeAtivo));
+        OnPropertyChanged(nameof(TextoFiltroUnidade));
+        OnPropertyChanged(nameof(ResumoTotalProdutos));
+        AvisoFiltroUnidade = string.Empty;
+
+        _filtroUnidadeStore?.Salvar(UnidadesFiltradas);
+        NotifyCanExecuteChanged();
+
+        PaginaAtual = 1;
+        _ = BuscarAsync();
+    }
+
     private int _paginaAtual = 1;
 
     public int PaginaAtual
@@ -181,13 +301,29 @@ public class ProdutoViewModel : BaseViewModel
 
 
 
-    public ProdutoViewModel(IProdutoService produtoService, IServiceScopeFactory scopeFactory)
+    public ProdutoViewModel(
+        IProdutoService produtoService,
+        IServiceScopeFactory scopeFactory,
+        IFiltroUnidadeEstoqueStore? filtroUnidadeStore = null)
 
     {
 
         _produtoService = produtoService;
 
         _scopeFactory = scopeFactory;
+        _filtroUnidadeStore = filtroUnidadeStore;
+
+        // O filtro de unidade volta como o operador deixou: ele só sai quando ele clica em
+        // "Limpar filtro". O ViewModel é recriado a cada visita à tela, então o estado vem do
+        // arquivo, e não do que estava em memória.
+        var salvas = _filtroUnidadeStore?.Carregar() ?? [];
+        foreach (var sigla in UnidadesMedida.Todas)
+        {
+            var opcao = new OpcaoUnidadeFiltro(sigla, salvas.Contains(sigla));
+            opcao.PropertyChanged += OpcaoUnidade_PropertyChanged;
+            OpcoesUnidade.Add(opcao);
+        }
+        LimparFiltroUnidadeCommand = new RelayCommand(LimparFiltroUnidade, () => FiltroUnidadeAtivo);
 
 
 
@@ -253,13 +389,14 @@ public class ProdutoViewModel : BaseViewModel
                 return;
             }
 
-            UiDispatcher.ExecutarNaUi(() => Carregando = true);
+            UiDispatcher.ExecutarNaUi(() => { AvisoFiltroUnidade = string.Empty; Carregando = true; });
 
             var resultado = await _produtoService.ObterPaginadoAsync(
                 PaginaAtual,
                 ItensPorPaginaPadrao,
                 string.IsNullOrWhiteSpace(TermoBusca) ? null : TermoBusca.Trim(),
                 ApenasEmPromocao,
+                FiltroUnidadeAtivo ? UnidadesFiltradas : null,
                 token).ConfigureAwait(false);
 
             if (token.IsCancellationRequested)
@@ -279,6 +416,7 @@ public class ProdutoViewModel : BaseViewModel
                 }
 
                 ProdutoSelecionado = null;
+                OnPropertyChanged(nameof(ResumoTotalProdutos));
                 OnPropertyChanged(nameof(InfoPaginacao));
                 OnPropertyChanged(nameof(PodePaginaAnterior));
                 OnPropertyChanged(nameof(PodePaginaProxima));
@@ -501,6 +639,17 @@ public class ProdutoViewModel : BaseViewModel
             return false;
 
 
+
+        // Achou, mas o produto é de uma unidade fora do filtro ligado: a lista ficaria vazia e
+        // pareceria "não encontrado". Em vez disso, o operador é avisado do porquê.
+        var unidadeDoProduto = UnidadesMedida.Normalizar(produto.Unidade);
+        if (FiltroUnidadeAtivo && !UnidadesFiltradas.Contains(unidadeDoProduto))
+        {
+            AvisoFiltroUnidade =
+                $"\"{produto.Nome}\" é da unidade {unidadeDoProduto}, fora do filtro ativo " +
+                $"({string.Join(", ", UnidadesFiltradas)}). Clique em Limpar filtro para vê-lo.";
+            return true;
+        }
 
         TermoBusca = produto.CodigoBarras ?? produto.CodigoInterno ?? produto.Nome;
 

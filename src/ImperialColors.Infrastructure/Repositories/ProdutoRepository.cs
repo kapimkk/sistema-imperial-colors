@@ -264,6 +264,7 @@ public class ProdutoRepository : RepositoryBase<Produto>, IProdutoRepository
         int itensPorPagina,
         string? termoBusca = null,
         bool apenasPromocao = false,
+        IReadOnlyCollection<string>? unidades = null,
         CancellationToken cancellationToken = default)
     {
         pagina = Math.Max(1, pagina);
@@ -279,6 +280,15 @@ public class ProdutoRepository : RepositoryBase<Produto>, IProdutoRepository
                 && p.PrecoPromocional.HasValue
                 && p.PrecoPromocional.Value > 0
                 && p.PrecoPromocional.Value < p.PrecoVenda);
+        }
+
+        // Filtro por unidade de medida (BD, GL, LA...). Combina com a busca e com a promocao:
+        // quem escolheu "so BD" quer BD em tudo que pesquisar. O total vem da mesma consulta
+        // filtrada, entao a paginacao conta so o que o filtro deixa passar.
+        if (unidades is { Count: > 0 })
+        {
+            var siglas = unidades.ToList();
+            query = query.Where(p => siglas.Contains(p.Unidade));
         }
 
         if (!string.IsNullOrWhiteSpace(termoBusca))

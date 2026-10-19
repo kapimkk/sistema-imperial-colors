@@ -99,6 +99,8 @@ public partial class App : System.Windows.Application
                 services.AddTransient<AuditoriaLogsViewModel>();
                 services.AddTransient<DashboardViewModel>();
                 services.AddTransient<ProdutoViewModel>();
+                // Singleton: o filtro de unidade do estoque precisa sobreviver a cada visita à tela.
+                services.AddSingleton<IFiltroUnidadeEstoqueStore, FiltroUnidadeEstoqueStore>();
                 services.AddTransient<VendaViewModel>();
                 services.AddTransient<ClienteViewModel>();
                 services.AddTransient<FornecedorViewModel>();

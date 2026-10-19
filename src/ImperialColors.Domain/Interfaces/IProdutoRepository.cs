@@ -75,5 +75,6 @@ public interface IProdutoRepository : IRepository<Produto>
         int itensPorPagina,
         string? termoBusca = null,
         bool apenasPromocao = false,
+        IReadOnlyCollection<string>? unidades = null,
         CancellationToken cancellationToken = default);
 }

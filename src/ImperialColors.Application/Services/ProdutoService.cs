@@ -63,10 +63,12 @@ public class ProdutoService : IProdutoService
         int itensPorPagina,
         string? termoBusca = null,
         bool apenasPromocao = false,
+        IReadOnlyCollection<string>? unidades = null,
         CancellationToken cancellationToken = default)
     {
         var (itens, total) = await _produtoRepository.ObterPaginadoAsync(
-            pagina, itensPorPagina, termoBusca, apenasPromocao, cancellationToken);
+            pagina, itensPorPagina, termoBusca, apenasPromocao,
+            NormalizarFiltroDeUnidades(unidades), cancellationToken);
 
         return new PaginacaoResultadoDto<ProdutoDto>
         {
@@ -75,6 +77,25 @@ public class ProdutoService : IProdutoService
             ItensPorPagina = itensPorPagina,
             TotalItens = total
         };
+    }
+
+    /// <summary>
+    /// Siglas do filtro de unidade prontas para o banco: maiusculas, sem repeticao e so as que
+    /// existem de fato. Devolve <c>null</c> (sem filtro) quando nao sobra nenhuma — uma sigla
+    /// invalida nao pode virar "nenhum produto", que pareceria estoque vazio.
+    /// </summary>
+    private static IReadOnlyCollection<string>? NormalizarFiltroDeUnidades(IReadOnlyCollection<string>? unidades)
+    {
+        if (unidades is null || unidades.Count == 0)
+            return null;
+
+        var validas = unidades
+            .Where(UnidadesMedida.EhValida)
+            .Select(u => u.Trim().ToUpperInvariant())
+            .Distinct()
+            .ToList();
+
+        return validas.Count == 0 ? null : validas;
     }
 
     public async Task<ProdutoDto?> ObterPorIdAsync(int id)

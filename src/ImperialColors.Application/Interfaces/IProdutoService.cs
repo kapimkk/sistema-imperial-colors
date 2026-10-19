@@ -18,6 +18,7 @@ public interface IProdutoService
         int itensPorPagina,
         string? termoBusca = null,
         bool apenasPromocao = false,
+        IReadOnlyCollection<string>? unidades = null,
         CancellationToken cancellationToken = default);
     Task<IEnumerable<ProdutoDto>> ObterComEstoqueBaixoAsync();
     Task<IEnumerable<ProdutoDto>> ObterSemEstoqueAsync();

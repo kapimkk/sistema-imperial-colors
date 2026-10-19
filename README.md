@@ -615,6 +615,11 @@ Se o IP do servidor mudar, atualiza-se **só o `hosts` do servidor** (ou a reser
 ### Estoque
 - Cadastro completo de produtos (código interno, código de barras, categoria, marca, etc.)
 - **Filtro "Apenas em Promoção"** — checkbox na listagem que exibe somente produtos com preço promocional ativo e menor que o preço de venda
+- **Filtro por unidade de medida** — botão **Unidade ⏷** ao lado da barra de pesquisa, com todas as unidades cadastráveis (UN, GL, LT, RL, CX, PCT, BD, BA, LA) para marcar uma ou mais:
+  - **Persistente:** o filtro vale para **tudo que o operador pesquisar**, para o "Apenas em Promoção", a paginação e o Atualizar, e **só sai ao clicar em ✕ Limpar filtro**. Sobrevive a trocar de tela e a fechar e abrir o sistema (guardado por usuário do Windows em `%LocalAppData%\ImperialColors\filtro_estoque.json`; se o arquivo estiver corrompido ou a pasta sem permissão, o estoque abre normalmente, sem filtro)
+  - O botão mostra o que está filtrado (`Unidade: BD`) e o contador do cabeçalho passa a dizer `N produtos na unidade BD`, para ninguém esquecer o filtro ligado
+  - O total e a paginação contam só o que o filtro deixa passar; mudar o filtro volta para a primeira página
+  - Leitor de código de barras: se o produto lido existe mas é de uma unidade fora do filtro, a tela avisa o motivo (em vez de parecer "não encontrado")
 - **Lista de estoque com colunas separadas de Quantidade e Unidade** — a quantidade (ex.: `3,6`, `1.234,5`) fica alinhada à direita, ordena como número e carrega a cor de alerta (laranja = estoque baixo, vermelho = zerado); a unidade (`UN`, `GL`, `LT`, `BD`...) vem em coluna própria, na sigla do cadastro. Antes era uma coluna só ("3,6 Litros"), que ordenava como texto
 - Controle de movimentações (entrada, saída, ajuste)
 - Alertas de estoque baixo

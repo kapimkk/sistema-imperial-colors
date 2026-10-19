@@ -31,10 +31,8 @@
         <Grid Grid.Row="0">
             <StackPanel>
                 <TextBlock Style="{StaticResource TituloModulo}" Text="Controle de Estoque"/>
-                <TextBlock Foreground="{StaticResource CinzaTextoBrush}" FontSize="13" Margin="0,4,0,0">
-                    <Run Text="{Binding TotalProdutos}"/>
-                    <Run Text=" produtos cadastrados"/>
-                </TextBlock>
+                <TextBlock x:Name="TxtResumoTotal" Foreground="{StaticResource CinzaTextoBrush}" FontSize="13" Margin="0,4,0,0"
+                           Text="{Binding ResumoTotalProdutos}"/>
             </StackPanel>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                 <Button Style="{StaticResource BotaoSecundario}" Command="{Binding MovimentacaoCommand}"
@@ -52,6 +50,7 @@
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0">
                     <TextBox x:Name="TxtBuscaEstoque" Style="{StaticResource TextBoxFiltro}"
@@ -60,16 +59,61 @@
                              KeyDown="TxtBuscaEstoque_KeyDown"/>
                     <TextBlock x:Name="TxtAvisoBarrasEstoque" Margin="4,4,0,0" FontSize="12"
                                Foreground="{StaticResource VermelhoErroBrush}" Visibility="Collapsed"/>
+                    <!-- Leitura de código de barras que achou um produto de unidade fora do filtro. -->
+                    <TextBlock x:Name="TxtAvisoFiltroUnidade" Margin="4,4,0,0" FontSize="12" TextWrapping="Wrap"
+                               Foreground="{StaticResource VermelhoErroBrush}"
+                               Text="{Binding AvisoFiltroUnidade}"
+                               Visibility="{Binding TemAvisoFiltroUnidade, Converter={StaticResource BoolToVisibility}}"/>
                     <CheckBox Margin="0,10,0,0" Content="Apenas em Promoção"
                               IsChecked="{Binding ApenasEmPromocao, UpdateSourceTrigger=PropertyChanged}"
                               FontSize="13" FontWeight="SemiBold"
                               Foreground="{StaticResource PretoPrimarioBrush}"/>
                 </StackPanel>
-                <Button Grid.Column="1" Style="{StaticResource BotaoSecundario}" Margin="10,0,0,0"
-                        Command="{Binding AtualizarCommand}" Content="⟳  Atualizar"/>
+
+                <!-- Filtro por unidade de medida: persistente, só sai em "Limpar filtro". -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top" Margin="10,0,0,0">
+                    <ToggleButton x:Name="BtnFiltroUnidade" Style="{StaticResource TogglePagamento}"
+                                  ToolTip="Mostrar só produtos de certas unidades de medida (BD, GL, LA...). O filtro fica ligado até você clicar em Limpar filtro."
+                                  IsChecked="{Binding FiltroUnidadeAberto, Mode=TwoWay}"
+                                  IsHitTestVisible="{Binding ElementName=PopupFiltroUnidade, Path=IsOpen, Converter={StaticResource InverseBool}}">
+                        <TextBlock>
+                            <Run Text="⏷  "/><Run Text="{Binding TextoFiltroUnidade, Mode=OneWay}"/>
+                        </TextBlock>
+                    </ToggleButton>
+                    <Button x:Name="BtnLimparFiltroUnidade" Style="{StaticResource BotaoSecundario}" Margin="8,0,0,0"
+                            Command="{Binding LimparFiltroUnidadeCommand}" Content="✕  Limpar filtro"
+                            Visibility="{Binding FiltroUnidadeAtivo, Converter={StaticResource BoolToVisibility}}"/>
+
+                    <Popup x:Name="PopupFiltroUnidade" PlacementTarget="{Binding ElementName=BtnFiltroUnidade}"
+                           Placement="Bottom" StaysOpen="False" AllowsTransparency="True"
+                           IsOpen="{Binding FiltroUnidadeAberto, Mode=TwoWay}">
+                        <Border Background="White" BorderBrush="#E8E8E8" BorderThickness="1" CornerRadius="8"
+                                Padding="14,12" Margin="0,6,8,8" MinWidth="190">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="14" ShadowDepth="2" Opacity="0.18" Color="#000000"/>
+                            </Border.Effect>
+                            <StackPanel>
+                                <TextBlock Text="Unidade de medida" FontWeight="SemiBold" FontSize="13" Margin="0,0,0,2"/>
+                                <TextBlock Text="Marque uma ou mais" FontSize="11" Margin="0,0,0,8"
+                                           Foreground="{StaticResource CinzaTextoBrush}"/>
+                                <ItemsControl x:Name="ListaUnidades" ItemsSource="{Binding OpcoesUnidade}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <CheckBox Content="{Binding Sigla}" IsChecked="{Binding Selecionada, Mode=TwoWay}"
+                                                      FontSize="13" Margin="0,3"/>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+                    </Popup>
+                </StackPanel>
+
                 <Button Grid.Column="2" Style="{StaticResource BotaoSecundario}" Margin="10,0,0,0"
+                        Command="{Binding AtualizarCommand}" Content="⟳  Atualizar"/>
+                <Button Grid.Column="3" Style="{StaticResource BotaoSecundario}" Margin="10,0,0,0"
                         Command="{Binding EditarProdutoCommand}" Content="✏  Editar"/>
-                <Button Grid.Column="3" Style="{StaticResource BotaoPerigo}" Margin="10,0,0,0"
+                <Button Grid.Column="4" Style="{StaticResource BotaoPerigo}" Margin="10,0,0,0"
                         Command="{Binding ExcluirProdutoCommand}" Content="🗑  Excluir"/>
             </Grid>
         </Border>

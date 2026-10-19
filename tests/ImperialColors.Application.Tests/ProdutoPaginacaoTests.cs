@@ -16,7 +16,7 @@ public class ProdutoPaginacaoTests
     {
         var produtoRepository = new Mock<IProdutoRepository>();
         produtoRepository
-            .Setup(r => r.ObterPaginadoAsync(2, 50, null, false, It.IsAny<CancellationToken>()))
+            .Setup(r => r.ObterPaginadoAsync(2, 50, null, false, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync((new List<Produto>
             {
                 new() { Id = 1, Nome = "Produto A", CodigoInterno = "P00001", Custo = 1, PrecoVenda = 2, Unidade = "UN" }
