@@ -71,7 +71,7 @@
                 </StackPanel>
 
                 <!-- Filtro por unidade de medida: persistente, só sai em "Limpar filtro". -->
-                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top" Margin="10,0,0,0">
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="10,0,0,0">
                     <ToggleButton x:Name="BtnFiltroUnidade" Style="{StaticResource TogglePagamento}"
                                   ToolTip="Mostrar só produtos de certas unidades de medida (BD, GL, LA...). O filtro fica ligado até você clicar em Limpar filtro."
                                   IsChecked="{Binding FiltroUnidadeAberto, Mode=TwoWay}"
@@ -146,6 +146,13 @@
                     <DataGridTextColumn Header="Quantidade" Width="110"
                                         Binding="{Binding QuantidadeEstoque, Converter={StaticResource QuantidadeConverter}}"
                                         SortMemberPath="QuantidadeEstoque">
+                        <!-- Valores à direita: o título acompanha, senão a coluna parece torta. -->
+                        <DataGridTextColumn.HeaderStyle>
+                            <Style TargetType="DataGridColumnHeader" BasedOn="{StaticResource DataGridHeaderModerno}">
+                                <Setter Property="HorizontalContentAlignment" Value="Right"/>
+                                <Setter Property="Padding" Value="12,10,12,10"/>
+                            </Style>
+                        </DataGridTextColumn.HeaderStyle>
                         <DataGridTextColumn.ElementStyle>
                             <Style TargetType="TextBlock">
                                 <Setter Property="TextAlignment" Value="Right"/>
