@@ -63,16 +63,21 @@ public class TributacaoProdutoDto
     public decimal? AliquotaIbsMunicipioDiferimento { get; set; }
     public decimal? AliquotaIbsMunicipioReducao { get; set; }
 
-    /// <summary>True quando o produto já tem ao menos um campo fiscal preenchido. As
-    /// alíquotas entram na conta: uma tributação salva só com a alíquota de ICMS (caso comum
-    /// de quem herda CST/CSOSN da Regra Geral da empresa) era considerada "vazia" e a tela de
-    /// edição do produto voltava com os campos em branco, como se nada tivesse sido salvo.</summary>
+    /// <summary>True quando qualquer campo fiscal está preenchido, inclusive percentuais
+    /// iguais a zero. Usado para salvar e reabrir a seção sem descartar campos isolados.</summary>
     public bool Preenchida =>
-        !string.IsNullOrWhiteSpace(Ncm) || !string.IsNullOrWhiteSpace(CstIcms) ||
+        !string.IsNullOrWhiteSpace(Ncm) || !string.IsNullOrWhiteSpace(Cest) || Origem.HasValue ||
+        !string.IsNullOrWhiteSpace(CstIcms) ||
         !string.IsNullOrWhiteSpace(CsosnIcms) || !string.IsNullOrWhiteSpace(CstIbsCbs) ||
         !string.IsNullOrWhiteSpace(CstPis) || !string.IsNullOrWhiteSpace(CstCofins) ||
         !string.IsNullOrWhiteSpace(CstIpi) || !string.IsNullOrWhiteSpace(CfopDentroEstado) ||
         !string.IsNullOrWhiteSpace(CfopForaEstado) ||
-        AliquotaIcms.HasValue || AliquotaPis.HasValue || AliquotaCofins.HasValue || AliquotaIpi.HasValue ||
-        AliquotaIcmsStRetido.HasValue;
+        !string.IsNullOrWhiteSpace(CodigoEnquadramentoIpi) || !string.IsNullOrWhiteSpace(ExTipi) ||
+        !string.IsNullOrWhiteSpace(UnidadeTributavel) || !string.IsNullOrWhiteSpace(GtinTributavel) ||
+        !string.IsNullOrWhiteSpace(CClassTrib) || !string.IsNullOrWhiteSpace(CstIS) ||
+        !string.IsNullOrWhiteSpace(CClassTribIS) ||
+        AliquotaIcms.HasValue || AliquotaIcmsSt.HasValue || Mva.HasValue || ReducaoBaseCalculo.HasValue ||
+        AliquotaIcmsStRetido.HasValue || AliquotaPis.HasValue || AliquotaCofins.HasValue ||
+        AliquotaIpi.HasValue || ValorIpiFixo.HasValue || FatorConversao.HasValue || AliquotaIS.HasValue ||
+        AliquotaIbsMunicipioDiferimento.HasValue || AliquotaIbsMunicipioReducao.HasValue;
 }

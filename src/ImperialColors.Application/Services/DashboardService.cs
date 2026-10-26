@@ -10,7 +10,7 @@ namespace ImperialColors.Application.Services;
 
 public class DashboardService : IDashboardService
 {
-    private const decimal LimiteEstoqueCritico = 5m;
+    private const decimal LimiteEstoqueCritico = 2m;
     private const int DiasLimiteValidadeProxima = 15;
     private const int TopEstoque = 10;
     private const int TopDestaques = 5;

@@ -53,7 +53,9 @@ public interface IProdutoRepository : IRepository<Produto>
     /// ainda mais urgente de tratar do que um perto de vencer. Ordenado pela validade mais
     /// próxima primeiro.</summary>
     Task<IEnumerable<Produto>> ObterProximosDaValidadeAsync(int diasLimite = 15);
-    Task<int> ContarComEstoqueCriticoAsync(decimal limiteUnidades = 5);
+    /// <summary>Produtos ativos com saldo positivo de até <paramref name="limiteUnidades"/>
+    /// unidades. Produtos zerados são contabilizados separadamente.</summary>
+    Task<int> ContarComEstoqueCriticoAsync(decimal limiteUnidades = 2);
 
     /// <summary>
     /// Conta os produtos zerados sem trazer nenhum deles. Existe porque o dashboard fazia

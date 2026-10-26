@@ -125,6 +125,21 @@ public class DashboardServiceTests
             produto.Object, produtoService.Object, analytics.Object);
 
     [Fact]
+    public async Task ObterDadosDashboardAsync_EstoqueCriticoUsaLimiteDeDuasUnidades()
+    {
+        var (vendaMock, produtoMock, produtoServiceMock, analyticsMock) = CriarMocks(new List<Venda>());
+        produtoMock.Setup(p => p.ContarComEstoqueCriticoAsync(2m)).ReturnsAsync(3);
+        produtoMock.Setup(p => p.ContarSemEstoqueAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+        var service = CriarServico(vendaMock, produtoMock, produtoServiceMock, analyticsMock);
+
+        var dados = await service.ObterDadosDashboardAsync();
+
+        Assert.Equal(3, dados.ProdutosEstoqueCritico);
+        Assert.Equal(1, dados.ProdutosSemEstoque);
+        produtoMock.Verify(p => p.ContarComEstoqueCriticoAsync(2m), Times.Once);
+    }
+
+    [Fact]
     public async Task ObterDadosDashboardAsync_CalculaLucroECustoAPartirDoCustoDoProduto()
     {
         var hoje = DateTime.Today;

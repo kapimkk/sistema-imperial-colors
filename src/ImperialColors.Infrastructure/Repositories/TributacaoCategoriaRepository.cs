@@ -48,6 +48,7 @@ public class TributacaoCategoriaRepository : ITributacaoCategoriaRepository
             existente.CsosnIcms = tributacao.CsosnIcms;
             existente.AliquotaIcms = tributacao.AliquotaIcms;
             existente.AliquotaIcmsSt = tributacao.AliquotaIcmsSt;
+            existente.AliquotaIcmsStRetido = tributacao.AliquotaIcmsStRetido;
             existente.Mva = tributacao.Mva;
             existente.ReducaoBaseCalculo = tributacao.ReducaoBaseCalculo;
             existente.CstPis = tributacao.CstPis;

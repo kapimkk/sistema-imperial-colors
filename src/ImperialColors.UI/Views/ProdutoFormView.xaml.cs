@@ -30,6 +30,7 @@ public partial class ProdutoFormView : Window
     private string? _imagemSelecionada;
     private bool _removerImagem;
     private int? _produtoId;
+    private bool _possuiTributacaoSalva;
     private decimal? _quantidadeEstoqueCarregadaNaEdicao;
     private bool _codigoDefinidoManualmente;
     private bool _codigoDesbloqueadoManualmente;
@@ -163,6 +164,7 @@ public partial class ProdutoFormView : Window
     {
         TxtTitulo.Text = "Novo Produto";
         _produtoId = null;
+        _possuiTributacaoSalva = false;
         _categoriaPendente = null;
         _marcaPendente = null;
         _fornecedorPendente = null;
@@ -275,6 +277,7 @@ public partial class ProdutoFormView : Window
 
     private async Task CarregarTributacaoAsync(int produtoId)
     {
+        _possuiTributacaoSalva = false;
         LimparCamposTributacao();
 
         TributacaoProdutoDto tributacao;
@@ -292,6 +295,7 @@ public partial class ProdutoFormView : Window
         if (tributacao is null || !tributacao.Preenchida)
             return;
 
+        _possuiTributacaoSalva = true;
         PreencherCamposTributacao(tributacao);
         ExpTributacao.IsExpanded = true;
     }
@@ -560,47 +564,13 @@ public partial class ProdutoFormView : Window
         => valor.HasValue ? valor.Value.ToString("0.####", FormattingHelper.CulturaPtBr) : string.Empty;
 
     /// <summary>Monta o DTO de tributação a partir dos campos preenchidos na tela.
-    /// Retorna null se nenhum campo fiscal foi preenchido (nada a salvar).
+    /// Retorna null se nenhum campo fiscal foi preenchido e não há tributação anterior.
+    /// Uma tributação existente pode ser esvaziada para remover os valores salvos.
     /// Lança <see cref="DomainException"/> quando algum percentual digitado não é um número
     /// válido — antes o texto inválido virava null em silêncio e o produto era salvo "sem
     /// alíquota", travando a emissão da nota sem nenhum aviso no cadastro.</summary>
     private TributacaoProdutoDto? MontarDtoTributacaoOuNulo()
     {
-        // As alíquotas contam como "campo preenchido": digitar só a alíquota de ICMS (o caso
-        // clássico de quem está corrigindo a nota bloqueada por falta de pICMS) devolvia null
-        // aqui, e o salvamento da tributação era pulado sem qualquer mensagem.
-        var temAlgumCampo =
-            !string.IsNullOrWhiteSpace(TxtAliquotaIcms.Text) ||
-            !string.IsNullOrWhiteSpace(TxtAliquotaIcmsSt.Text) ||
-            !string.IsNullOrWhiteSpace(TxtAliquotaPis.Text) ||
-            !string.IsNullOrWhiteSpace(TxtAliquotaCofins.Text) ||
-            !string.IsNullOrWhiteSpace(TxtAliquotaIpi.Text) ||
-            !string.IsNullOrWhiteSpace(TxtMva.Text) ||
-            !string.IsNullOrWhiteSpace(TxtReducaoBaseCalculo.Text) ||
-            !string.IsNullOrWhiteSpace(TxtAliquotaIcmsStRetido.Text) ||
-            !string.IsNullOrWhiteSpace(TxtAliquotaIS.Text) ||
-            !string.IsNullOrWhiteSpace(TxtNcm.Text) ||
-            !string.IsNullOrWhiteSpace(TxtCest.Text) ||
-            CmbOrigem.SelectedItem is not null ||
-            !string.IsNullOrWhiteSpace(TxtCstIcms.Text) ||
-            !string.IsNullOrWhiteSpace(TxtCsosnIcms.Text) ||
-            !string.IsNullOrWhiteSpace(TxtCstPis.Text) ||
-            !string.IsNullOrWhiteSpace(TxtCstCofins.Text) ||
-            !string.IsNullOrWhiteSpace(TxtCstIpi.Text) ||
-            !string.IsNullOrWhiteSpace(TxtUnidadeTributavel.Text) ||
-            !string.IsNullOrWhiteSpace(TxtGtinTributavel.Text) ||
-            !string.IsNullOrWhiteSpace(TxtCfopDentroEstado.Text) ||
-            !string.IsNullOrWhiteSpace(TxtCfopForaEstado.Text) ||
-            !string.IsNullOrWhiteSpace(TxtCstIbsCbs.Text) ||
-            !string.IsNullOrWhiteSpace(TxtCClassTrib.Text) ||
-            !string.IsNullOrWhiteSpace(TxtCstIS.Text) ||
-            !string.IsNullOrWhiteSpace(TxtCClassTribIS.Text) ||
-            !string.IsNullOrWhiteSpace(TxtValorIpiFixo.Text) ||
-            !string.IsNullOrWhiteSpace(TxtExTipi.Text);
-
-        if (!temAlgumCampo)
-            return null;
-
         var aliquotaIcms = LerNumeroOpcional(TxtAliquotaIcms, "Alíquota de ICMS");
         var aliquotaIcmsSt = LerNumeroOpcional(TxtAliquotaIcmsSt, "Alíquota de ICMS-ST");
         var mva = LerNumeroOpcional(TxtMva, "MVA/IVA-ST");
@@ -615,7 +585,7 @@ public partial class ProdutoFormView : Window
         var aliquotaIbsMunicipioDiferimento = LerNumeroOpcional(TxtAliquotaIbsMunicipioDiferimento, "Alíquota de diferimento do IBS Municipal");
         var aliquotaIbsMunicipioReducao = LerNumeroOpcional(TxtAliquotaIbsMunicipioReducao, "Redução de alíquota do IBS Municipal");
 
-        return new TributacaoProdutoDto
+        var tributacao = new TributacaoProdutoDto
         {
             Ncm = TextoOuNulo(TxtNcm.Text),
             Cest = TextoOuNulo(TxtCest.Text),
@@ -649,6 +619,7 @@ public partial class ProdutoFormView : Window
             AliquotaIbsMunicipioDiferimento = aliquotaIbsMunicipioDiferimento,
             AliquotaIbsMunicipioReducao = aliquotaIbsMunicipioReducao
         };
+        return tributacao.Preenchida || _possuiTributacaoSalva ? tributacao : null;
     }
 
     private static string? TextoOuNulo(string texto)

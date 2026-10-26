@@ -57,17 +57,9 @@ public class TributacaoCategoriaDto
     public decimal? AliquotaIbsMunicipioDiferimento { get; set; }
     public decimal? AliquotaIbsMunicipioReducao { get; set; }
 
-    /// <summary>True quando a categoria já tem ao menos um campo fiscal padrão preenchido.</summary>
-    /// <summary>Mesma regra de <see cref="TributacaoProdutoDto.Preenchida"/> — as alíquotas
-    /// também contam, senão um padrão de categoria salvo só com alíquota some da tela.</summary>
-    public bool Preenchida =>
-        !string.IsNullOrWhiteSpace(Ncm) || !string.IsNullOrWhiteSpace(CstIcms) ||
-        !string.IsNullOrWhiteSpace(CsosnIcms) || !string.IsNullOrWhiteSpace(CstIbsCbs) ||
-        !string.IsNullOrWhiteSpace(CstPis) || !string.IsNullOrWhiteSpace(CstCofins) ||
-        !string.IsNullOrWhiteSpace(CstIpi) || !string.IsNullOrWhiteSpace(CfopDentroEstado) ||
-        !string.IsNullOrWhiteSpace(CfopForaEstado) ||
-        AliquotaIcms.HasValue || AliquotaPis.HasValue || AliquotaCofins.HasValue || AliquotaIpi.HasValue ||
-        AliquotaIcmsStRetido.HasValue;
+    /// <summary>Mesma regra de <see cref="TributacaoProdutoDto.Preenchida"/> para os campos
+    /// compartilhados: um padrão com apenas um campo também deve ser herdado pelo produto.</summary>
+    public bool Preenchida => ParaProdutoDto(produtoId: 0).Preenchida;
 
     /// <summary>Converte para o DTO de produto (usado ao herdar o padrão na tela de cadastro).</summary>
     public TributacaoProdutoDto ParaProdutoDto(int produtoId) => new()
