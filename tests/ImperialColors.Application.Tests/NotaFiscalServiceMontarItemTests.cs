@@ -335,8 +335,7 @@ public class NotaFiscalServiceMontarItemTests
 
     /// <summary>Abrir um rascunho em modo manual (CalculoAutomatico=false) não deve
     /// sobrescrever silenciosamente um total que o operador digitou à mão — só o ITEM é
-    /// corrigido. (A sincronização pré-emissão em EmitirAsync força esse recálculo por fora,
-    /// já que ali os totais têm que refletir os itens de qualquer forma.)</summary>
+    /// corrigido. A mesma preservação é aplicada na sincronização pré-emissão.</summary>
     [Fact]
     public async Task SincronizarTributacaoComCadastroAtualAsync_ComCalculoManual_PreservaTotalDigitadoMasCorrigeOItem()
     {

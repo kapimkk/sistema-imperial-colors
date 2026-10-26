@@ -219,9 +219,8 @@ public class NotaFiscalService : INotaFiscalService
         }
 
         // Respeita o modo manual da tela (CalculoAutomatico=false): abrir um rascunho para
-        // edição não deve sobrescrever totais que o operador digitou à mão. A sincronização
-        // pré-emissão (EmitirAsync) força o recálculo por fora desta chamada — ali os totais
-        // têm que refletir os itens de qualquer forma, indo ou não para a API.
+        // edição ou emitir não deve sobrescrever totais que o operador digitou à mão.
+        // No modo automático, os totais acompanham os itens recém-sincronizados.
         return RecalcularTotais(nota);
     }
 
@@ -335,12 +334,9 @@ public class NotaFiscalService : INotaFiscalService
         return AplicarTotaisCalculados(nota);
     }
 
-    /// <summary>Núcleo do cálculo de totais, sem o gate de <see cref="NotaFiscalDto.CalculoAutomatico"/>
-    /// — usado tanto por <see cref="RecalcularTotais"/> (que respeita o modo manual da tela)
-    /// quanto pela sincronização pré-emissão, onde os totais TÊM que refletir os itens
-    /// (o payload usa nota.VIcms/nota.VNf diretamente em vários campos, não só a soma dos
-    /// itens — ver NotaFiscalPayloadBuilder.ConstruirTotal), mesmo que o operador tenha
-    /// digitado os totais manualmente antes da tributação ser corrigida.</summary>
+    /// <summary>Calcula os totais a partir dos itens quando o cálculo automático está ligado.
+    /// No modo manual, <see cref="RecalcularTotais"/> preserva os valores informados pelo
+    /// operador, inclusive na sincronização que antecede a emissão.</summary>
     private static NotaFiscalDto AplicarTotaisCalculados(NotaFiscalDto nota)
     {
         for (var i = 0; i < nota.Itens.Count; i++)
@@ -509,11 +505,9 @@ public class NotaFiscalService : INotaFiscalService
         {
             var dtoParaSincronizar = await MapearParaDtoAsync(entidade);
             var dtoSincronizado = await SincronizarTributacaoComCadastroAtualAsync(dtoParaSincronizar, empresa, cancellationToken);
-            // Força os totais a refletirem os itens recém-sincronizados mesmo se a nota está
-            // em modo manual (CalculoAutomatico=false) — o payload usa nota.VIcms/nota.VNf
-            // diretamente, então eles não podem ficar defasados em relação aos itens no
-            // momento da emissão, independente do que o operador digitou enquanto rascunhava.
-            dtoSincronizado = AplicarTotaisCalculados(dtoSincronizado);
+            // A sincronização respeita CalculoAutomatico: os totais manuais seguem para
+            // a emissão como foram salvos. O operador deve conferir sua consistência com
+            // os itens, que continuam sujeitos à tributação atual do cadastro.
             entidade = MapearParaEntidade(dtoSincronizado, entidade);
             await _notaFiscalRepository.AtualizarAsync(entidade, substituirItens: true, cancellationToken: cancellationToken);
         }

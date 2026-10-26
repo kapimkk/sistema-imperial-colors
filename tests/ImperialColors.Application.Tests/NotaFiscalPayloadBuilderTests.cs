@@ -153,7 +153,44 @@ public class NotaFiscalPayloadBuilderTests
         Assert.Equal("Tinta Coral 18L", payload.InfNFe.Det[0].Prod.XProd);
     }
 
-    // ===== MathematicalValidator: soma dos itens precisa reconciliar com os totais =====
+    // ===== Cálculo manual: totais informados pelo operador são enviados sem recálculo =====
+
+    [Fact]
+    public void Total_CalculoManual_PreservaValoresDaNotaSemAlterarOsItens()
+    {
+        var nota = NotaValida();
+        nota.CalculoAutomatico = false;
+        nota.VProd = 150.125m;
+        nota.VIpi = 7.125m;
+        nota.VBcIcms = 120m;
+        nota.VIcms = 12m;
+        nota.VBcIcmsSt = 160m;
+        nota.VIcmsSt = 3m;
+        nota.VFrete = 10m;
+        nota.VSeg = 5m;
+        nota.VDesc = 9m;
+        nota.VOutro = 4m;
+        nota.VFcp = 6m;
+        nota.VFcpSt = 8m;
+        nota.VFcpStRet = 11m;
+        nota.VIpiDevolvido = 2m;
+        nota.VAproxImp = 18.125m;
+        nota.VNf = 170.125m;
+
+        var payload = NotaFiscalPayloadBuilder.Construir(nota, EmitenteValido());
+
+        var total = payload.InfNFe.Total.ICMSTot;
+        Assert.Equal(150.13m, total.VProd);
+        Assert.Equal(7.13m, total.VIPI);
+        Assert.Equal(170.13m, total.VNF);
+        Assert.Equal(18.13m, total.VTotTrib);
+        Assert.Equal(new[] { 120m, 12m, 160m, 3m, 10m, 5m, 9m, 4m, 6m, 8m, 11m, 2m },
+            new[] { total.VBC, total.VICMS, total.VBCST, total.VST, total.VFrete, total.VSeg,
+                total.VDesc, total.VOutro, total.VFCP, total.VFCPST, total.VFCPSTRet, total.VIPIDevol });
+        Assert.Equal(100m, Assert.Single(payload.InfNFe.Det).Prod.VProd);
+    }
+
+    // ===== Cálculo automático: soma dos itens precisa reconciliar com os totais =====
 
     [Fact]
     public void Total_VNF_ReconciliaExatamenteComASomaDosItensEnviados()

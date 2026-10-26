@@ -422,9 +422,8 @@ internal static class NotaFiscalPayloadBuilder
         var vProdSoma = itensQueCompoem.Sum(d => d.Prod.VProd);
         var vIbsSoma = det.Sum(d => d.Imposto.IBSCBS.TribDetails.VIBS);
         var vCbsSoma = det.Sum(d => d.Imposto.IBSCBS.TribDetails.GCBS.VCBS);
-        // Somado a partir do grupo IPI de cada item (fonte real, igual vProd/vNF/vIBS/vCBS
-        // acima) em vez de nota.VIpi — o vOutro que carregava esse valor pro item 1 não
-        // existe mais (ConstruirItem monta o grupo IPI próprio agora).
+        // No cálculo automático, o IPI acompanha o grupo próprio de cada item.
+        // O modo manual preserva os totais da nota, sem alterar os impostos dos itens.
         var vIpiSoma = det.Sum(d => d.Imposto.IPI?.IPIDetails.VIPI ?? 0);
 
         // vNF = Σ(vProd − vDesc + vFrete + vSeg + vOutro) + vIPI. O vIPI entra por FORA da soma
@@ -448,17 +447,18 @@ internal static class NotaFiscalPayloadBuilder
                 VST = ArredondarValor(nota.VIcmsSt),
                 VFCPST = ArredondarValor(nota.VFcpSt),
                 VFCPSTRet = ArredondarValor(nota.VFcpStRet),
-                VProd = Math.Round(vProdSoma, 2, MidpointRounding.AwayFromZero),
+                VProd = nota.CalculoAutomatico ? ArredondarValor(vProdSoma) : ArredondarValor(nota.VProd),
                 VFrete = ArredondarValor(nota.VFrete),
                 VSeg = ArredondarValor(nota.VSeg),
                 VDesc = ArredondarValor(nota.VDesc),
                 VII = 0m,
-                VIPI = Math.Round(vIpiSoma, 2, MidpointRounding.AwayFromZero),
+                VIPI = nota.CalculoAutomatico ? ArredondarValor(vIpiSoma) : ArredondarValor(nota.VIpi),
                 VIPIDevol = ArredondarValor(nota.VIpiDevolvido),
                 VPIS = Math.Round(nota.Itens.Sum(i => i.ValorPis ?? 0), 2, MidpointRounding.AwayFromZero),
                 VCOFINS = Math.Round(nota.Itens.Sum(i => i.ValorCofins ?? 0), 2, MidpointRounding.AwayFromZero),
                 VOutro = ArredondarValor(nota.VOutro),
-                VNF = Math.Round(vNfSoma, 2, MidpointRounding.AwayFromZero)
+                VNF = nota.CalculoAutomatico ? ArredondarValor(vNfSoma) : ArredondarValor(nota.VNf),
+                VTotTrib = nota.VAproxImp == 0m ? null : ArredondarValor(nota.VAproxImp)
             },
             IBSCBSTot = new IbsCbsTotContract
             {

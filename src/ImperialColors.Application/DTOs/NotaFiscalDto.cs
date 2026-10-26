@@ -61,6 +61,7 @@ public class NotaFiscalDto
     public string? EntregaCodigoMunicipioIbge { get; set; }
 
     // Cálculo do imposto
+    /// <summary>Quando falso, os totais informados no cadastro são preservados na emissão.</summary>
     public bool CalculoAutomatico { get; set; } = true;
     public decimal VProd { get; set; }
     public decimal VServ { get; set; }

@@ -5,7 +5,7 @@
         WindowStartupLocation="CenterOwner" ResizeMode="CanResize" ShowInTaskbar="False">
 
     <Window.Resources>
-        <ResourceDictionary Source="/Resources/AppTheme.xaml"/>
+        <ResourceDictionary Source="pack://application:,,,/ImperialColors;component/Resources/AppTheme.xaml"/>
     </Window.Resources>
 
     <Grid Background="{StaticResource CinzaClaroBrush}">
@@ -406,27 +406,24 @@
                 <!-- ============ BLOCO: CÁLCULO DO IMPOSTO ============ -->
                 <Border Style="{StaticResource Card}" Padding="16" Margin="0,0,0,14">
                     <StackPanel>
-                        <!-- A caixa "Cálculo ligado" saiu daqui. Ela prometia um controle que não
-                             existia: NotaFiscalService.EmitirAsync SEMPRE recalcula os totais a
-                             partir dos itens antes de transmitir (para Rascunho e Rejeitada — os
-                             únicos status em que a tela de Ações oferece "Emitir"), então tudo que
-                             fosse digitado à mão nestes campos era descartado no momento da
-                             emissão. Os valores agora são somente-leitura e mostram o que
-                             realmente vai no XML. -->
                         <Grid Margin="0,0,0,10">
                             <TextBlock Text="Cálculo do Imposto" FontSize="14" FontWeight="SemiBold" HorizontalAlignment="Left"/>
-                            <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" FontSize="11"
-                                       Foreground="{StaticResource CinzaTextoBrush}"
-                                       Text="Calculado a partir dos itens"
-                                       ToolTip="Estes totais são recalculados automaticamente a partir dos itens no momento da emissão — é exatamente o que vai no XML enviado à SEFAZ."/>
+                            <CheckBox x:Name="ChkCalculoAutomatico" Content="Cálculo automático"
+                                      Style="{StaticResource CheckBoxModerno}" IsChecked="True"
+                                      HorizontalAlignment="Right" VerticalAlignment="Center"
+                                      Checked="ChkCalculoAutomatico_Changed" Unchecked="ChkCalculoAutomatico_Changed"
+                                      ToolTip="Desmarque para editar os valores. Ao marcar novamente, os totais são recalculados a partir dos itens."/>
                         </Grid>
+                        <TextBlock Text="Para alterar os valores, desmarque Cálculo automático. Confira os totais manuais com os itens antes de emitir."
+                                   TextWrapping="Wrap" FontSize="11" Margin="0,0,0,10"
+                                   Foreground="{StaticResource CinzaTextoBrush}"/>
 
                         <!-- "Total Serviços" (vServ) e "Valor ISSQN" (vIssqn) foram removidos daqui:
                              este módulo emite NF-e/NFC-e (modelos 55/65), que não têm grupo ISSQN no
                              payload. Enquanto existiram, qualquer valor digitado neles entrava no
                              total local mas NÃO no vNF transmitido — a nota saía com total menor que
                              a soma dos pagamentos e a SEFAZ rejeitava. Ver NotaFiscal.VServ. -->
-                        <UniformGrid Columns="4" Rows="5">
+                        <UniformGrid Columns="4" Rows="5" TextBox.TextChanged="CampoCalculo_TextChanged">
                             <StackPanel Margin="0,0,10,10">
                                 <TextBlock Style="{StaticResource LabelCampo}" Text="Total Produtos"/>
                                 <TextBox x:Name="TxtVProd" Style="{StaticResource TextBoxNumerico}"/>

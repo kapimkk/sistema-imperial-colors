@@ -66,6 +66,7 @@ public class NotaFiscal : BaseEntity
 
     // --- Bloco "Cálculo do imposto" — nomes de campo seguem a tag oficial do total.ICMSTot
     // /total.IBSCBSTot, mesma convenção já usada em TotaisFiscaisVendaDto. ---
+    /// <summary>Quando falso, os totais informados no cadastro são preservados na emissão.</summary>
     public bool CalculoAutomatico { get; set; } = true;
     public decimal VProd { get; set; }
 

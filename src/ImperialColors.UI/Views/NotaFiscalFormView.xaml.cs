@@ -43,6 +43,7 @@ public partial class NotaFiscalFormView : Window
     private readonly ObservableCollection<PagamentoUi> _pagamentos = new();
     private ConfiguracaoFiscalEmpresaDto _empresaFiscal = new();
     private bool _carregando = true;
+    private bool _atualizandoCalculo;
 
     public NotaFiscalFormView(IServiceProvider serviceProvider, TipoNotaFiscal tipo, int? notaFiscalId)
     {
@@ -279,7 +280,8 @@ public partial class NotaFiscalFormView : Window
         _pagamentos.Clear();
         foreach (var pagamento in n.Pagamentos) _pagamentos.Add(new PagamentoUi(pagamento));
 
-        AplicarSomenteLeituraCalculo();
+        ChkCalculoAutomatico.IsChecked = n.CalculoAutomatico;
+        AplicarPermissaoCalculo();
         AtualizarCamposCalculo(n);
 
         SelecionarEnum<ModalidadeFrete>(CmbFormaEnvio, n.FormaEnvio);
@@ -310,24 +312,32 @@ public partial class NotaFiscalFormView : Window
 
     private void AtualizarCamposCalculo(NotaFiscalDto n)
     {
-        TxtVProd.Text = n.VProd.ToString("0.00");
-        TxtVFrete.Text = n.VFrete.ToString("0.00");
-        TxtVSeg.Text = n.VSeg.ToString("0.00");
-        TxtVBcIcms.Text = n.VBcIcms.ToString("0.00");
-        TxtVIcms.Text = n.VIcms.ToString("0.00");
-        TxtVBcIcmsSt.Text = n.VBcIcmsSt.ToString("0.00");
-        TxtVIcmsSt.Text = n.VIcmsSt.ToString("0.00");
-        TxtVIpi.Text = n.VIpi.ToString("0.00");
-        TxtVIpiDevolvido.Text = n.VIpiDevolvido.ToString("0.00");
-        TxtVOutro.Text = n.VOutro.ToString("0.00");
-        TxtVDesc.Text = n.VDesc.ToString("0.00");
-        TxtVFunrural.Text = n.VFunrural.ToString("0.00");
-        TxtNumeroItens.Text = n.NumeroItens.ToString();
-        TxtVAproxImp.Text = n.VAproxImp.ToString("0.00");
-        TxtVFcp.Text = n.VFcp.ToString("0.00");
-        TxtVFcpSt.Text = n.VFcpSt.ToString("0.00");
-        TxtVFcpStRet.Text = n.VFcpStRet.ToString("0.00");
-        TxtVNf.Text = n.VNf.ToString("0.00");
+        _atualizandoCalculo = true;
+        try
+        {
+            TxtVProd.Text = n.VProd.ToString("0.00");
+            TxtVFrete.Text = n.VFrete.ToString("0.00");
+            TxtVSeg.Text = n.VSeg.ToString("0.00");
+            TxtVBcIcms.Text = n.VBcIcms.ToString("0.00");
+            TxtVIcms.Text = n.VIcms.ToString("0.00");
+            TxtVBcIcmsSt.Text = n.VBcIcmsSt.ToString("0.00");
+            TxtVIcmsSt.Text = n.VIcmsSt.ToString("0.00");
+            TxtVIpi.Text = n.VIpi.ToString("0.00");
+            TxtVIpiDevolvido.Text = n.VIpiDevolvido.ToString("0.00");
+            TxtVOutro.Text = n.VOutro.ToString("0.00");
+            TxtVDesc.Text = n.VDesc.ToString("0.00");
+            TxtVFunrural.Text = n.VFunrural.ToString("0.00");
+            TxtNumeroItens.Text = n.NumeroItens.ToString();
+            TxtVAproxImp.Text = n.VAproxImp.ToString("0.00");
+            TxtVFcp.Text = n.VFcp.ToString("0.00");
+            TxtVFcpSt.Text = n.VFcpSt.ToString("0.00");
+            TxtVFcpStRet.Text = n.VFcpStRet.ToString("0.00");
+            TxtVNf.Text = n.VNf.ToString("0.00");
+        }
+        finally
+        {
+            _atualizandoCalculo = false;
+        }
     }
 
     // --- Bloco Nota fiscal ---
@@ -550,26 +560,22 @@ public partial class NotaFiscalFormView : Window
 
     private void RecalcularTotaisUi()
     {
-        if (_carregando) return;
+        if (_carregando || !_nota.PodeEditar) return;
 
         _nota.Itens = _itens.ToList();
-        _nota.CalculoAutomatico = true;
+        _nota.NumeroItens = _itens.Count;
+        TxtNumeroItens.Text = _nota.NumeroItens.ToString();
+        if (!_nota.CalculoAutomatico) return;
+
         _notaFiscalService.RecalcularTotais(_nota);
         AtualizarCamposCalculo(_nota);
     }
 
     // --- Bloco Cálculo do imposto ---
 
-    /// <summary>
-    /// Todos os campos de total são somente-leitura, sempre. A caixa "Cálculo ligado" que
-    /// existia aqui era uma promessa vazia: <c>NotaFiscalService.EmitirAsync</c> chama
-    /// <c>AplicarTotaisCalculados</c> para notas Rascunho e Rejeitada — e a tela de Ações só
-    /// oferece "Emitir" nesses dois status — então qualquer valor digitado à mão era
-    /// silenciosamente sobrescrito no momento de transmitir. Deixar os campos editáveis
-    /// fazia o operador acreditar num controle que ele não tinha.
-    /// </summary>
-    private void AplicarSomenteLeituraCalculo()
+    private void AplicarPermissaoCalculo()
     {
+        ChkCalculoAutomatico.IsEnabled = _nota.PodeEditar;
         foreach (var caixa in new[]
         {
             TxtVProd, TxtVFrete, TxtVSeg, TxtVBcIcms, TxtVIcms, TxtVBcIcmsSt, TxtVIcmsSt,
@@ -577,8 +583,96 @@ public partial class NotaFiscalFormView : Window
             TxtVFcp, TxtVFcpSt, TxtVFcpStRet
         })
         {
-            caixa.IsReadOnly = true;
+            caixa.IsReadOnly = !_nota.PodeEditar || ChkCalculoAutomatico.IsChecked == true;
         }
+    }
+
+    private void ChkCalculoAutomatico_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_carregando || _atualizandoCalculo || !_nota.PodeEditar) return;
+
+        try
+        {
+            // Preserva frete, seguro, despesas e desconto digitados ao voltar ao automático.
+            if (!_nota.CalculoAutomatico)
+                LerCamposCalculo();
+
+            _nota.CalculoAutomatico = ChkCalculoAutomatico.IsChecked == true;
+            AplicarPermissaoCalculo();
+            RecalcularTotaisUi();
+        }
+        catch (DomainException ex)
+        {
+            _atualizandoCalculo = true;
+            ChkCalculoAutomatico.IsChecked = false;
+            _atualizandoCalculo = false;
+            AplicarPermissaoCalculo();
+            MostrarMensagem(ex.Message, sucesso: false);
+        }
+    }
+
+    private void CampoCalculo_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_carregando || _atualizandoCalculo || _nota.CalculoAutomatico || !_nota.PodeEditar)
+            return;
+        if (e.OriginalSource == TxtVNf || e.OriginalSource == TxtNumeroItens) return;
+
+        var caixasTotal = new[] { TxtVProd, TxtVIcmsSt, TxtVFrete, TxtVSeg, TxtVOutro, TxtVIpi, TxtVDesc };
+        var valores = new decimal[caixasTotal.Length];
+        for (var i = 0; i < caixasTotal.Length; i++)
+            if (!TentarLerValorCalculo(caixasTotal[i], out valores[i])) return;
+
+        TxtVNf.Text = (valores[0] + valores[1] + valores[2] + valores[3] + valores[4] + valores[5] - valores[6]).ToString("0.00");
+    }
+
+    private static bool TentarLerValorCalculo(TextBox caixa, out decimal valor)
+    {
+        valor = 0m;
+        if (string.IsNullOrWhiteSpace(caixa.Text)) return true;
+        if (!FormattingHelper.TryParseMoeda(caixa.Text, out valor) || valor < 0m) return false;
+        valor = Math.Round(valor, 2, MidpointRounding.AwayFromZero);
+        return true;
+    }
+
+    private void LerCamposCalculo()
+    {
+        var campos = new (TextBox Caixa, string Rotulo)[]
+        {
+            (TxtVProd, "Total Produtos"), (TxtVFrete, "Valor do Frete"), (TxtVSeg, "Valor do Seguro"),
+            (TxtVBcIcms, "Base ICMS"), (TxtVIcms, "Valor ICMS"), (TxtVBcIcmsSt, "Base ICMS ST"),
+            (TxtVIcmsSt, "Valor ICMS ST"), (TxtVIpi, "Valor IPI"), (TxtVIpiDevolvido, "IPI Devolvido"),
+            (TxtVOutro, "Despesas"), (TxtVDesc, "Desconto"), (TxtVFunrural, "Valor Funrural"),
+            (TxtVAproxImp, "Valor Aprox. Impostos"), (TxtVFcp, "Total do FCP"),
+            (TxtVFcpSt, "Total FCP ST"), (TxtVFcpStRet, "FCP ST Ret. Anteriormente")
+        };
+        var valores = new decimal[campos.Length];
+        for (var i = 0; i < campos.Length; i++)
+        {
+            if (!TentarLerValorCalculo(campos[i].Caixa, out var valor))
+            {
+                campos[i].Caixa.Focus();
+                throw new DomainException($"Informe um valor válido, maior ou igual a zero, em {campos[i].Rotulo}.");
+            }
+            valores[i] = valor;
+        }
+
+        _nota.VProd = valores[0];
+        _nota.VFrete = valores[1];
+        _nota.VSeg = valores[2];
+        _nota.VBcIcms = valores[3];
+        _nota.VIcms = valores[4];
+        _nota.VBcIcmsSt = valores[5];
+        _nota.VIcmsSt = valores[6];
+        _nota.VIpi = valores[7];
+        _nota.VIpiDevolvido = valores[8];
+        _nota.VOutro = valores[9];
+        _nota.VDesc = valores[10];
+        _nota.VFunrural = valores[11];
+        _nota.VAproxImp = valores[12];
+        _nota.VFcp = valores[13];
+        _nota.VFcpSt = valores[14];
+        _nota.VFcpStRet = valores[15];
+        _nota.VNf = _nota.VProd + _nota.VIcmsSt + _nota.VFrete + _nota.VSeg + _nota.VOutro + _nota.VIpi - _nota.VDesc;
     }
 
     // --- Bloco Pagamento ---
@@ -653,10 +747,10 @@ public partial class NotaFiscalFormView : Window
         // Nota" (separado de propósito, para que o horário de emissão enviado à SEFAZ
         // seja sempre o momento exato do clique em Emitir, não o momento em que a nota
         // foi digitada/salva — ver NotaFiscalService.EmitirAsync).
-        LerFormularioParaDto();
         BtnSalvarRascunho.IsEnabled = false;
         try
         {
+            LerFormularioParaDto();
             _nota = _nota.Id == 0
                 ? await _notaFiscalService.CriarRascunhoAsync(_nota)
                 : await _notaFiscalService.AtualizarRascunhoAsync(_nota);
@@ -742,12 +836,16 @@ public partial class NotaFiscalFormView : Window
         _nota.Itens = _itens.ToList();
         _nota.Pagamentos = _pagamentos.Select(p => p.ParaDto()).ToList();
 
-        // Os totais vêm SEMPRE dos itens. O ramo "manual" que existia aqui — lendo os 16
-        // campos da tela e montando o vNF na mão — era inalcançável na prática:
-        // NotaFiscalService.EmitirAsync recalcula tudo antes de transmitir, então o que fosse
-        // digitado nunca chegava ao XML. Ver AplicarSomenteLeituraCalculo.
-        _nota.CalculoAutomatico = true;
+        _nota.CalculoAutomatico = ChkCalculoAutomatico.IsChecked == true;
+        _nota.NumeroItens = _itens.Count;
+        if (!_nota.CalculoAutomatico)
+            LerCamposCalculo();
         _notaFiscalService.RecalcularTotais(_nota);
+        if (_nota.VNf < 0m)
+        {
+            TxtVDesc.Focus();
+            throw new DomainException("O desconto não pode deixar o total da nota negativo.");
+        }
         AtualizarCamposCalculo(_nota);
 
         _nota.FormaEnvio = ObterEnumSelecionado(CmbFormaEnvio, ModalidadeFrete.SemOcorrenciaTransporte);
